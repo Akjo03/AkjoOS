@@ -1,3 +1,4 @@
+use alloc::format;
 use crate::api::display::Fonts;
 use crate::drivers::display::DisplayDriverType;
 use crate::internal::serial::{SerialLoggingLevel, SerialPortLogger};
@@ -31,12 +32,17 @@ pub struct Kernel<'a> {
             DisplayDriverType::Text(driver, _) => {
                 driver.clear_buffer();
 
-                driver.write_string("C:\\> ");
-                if tick % 3000 == 0 { driver.blink(); }
+                driver.write_string(format!(
+                    "C:\\> Kernel at tick {}.",
+                    tick
+                ).as_str());
+                if tick % 2800 == 0 { driver.blink(); }
             }, _ => panic!("Unsupported display driver type!")
         }
 
         self.display_manager.draw_all();
+
+        if tick > 50000 { self.running = false; }
     }
 
     pub fn halt(&mut self) -> ! {
