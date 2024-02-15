@@ -1,0 +1,26 @@
+[workspace]
+members = [ "kernel" ]
+resolver = "2"
+
+[package]
+name = "test_os"
+version = "0.1.0"
+edition = "2021"
+default-run = "qemu-uefi"
+
+[dependencies]
+ovmf-prebuilt = "0.1.0-alpha"
+
+[build-dependencies]
+bootloader = "0.11.6"
+kernel = { path = "kernel", artifact = "bin", target = "x86_64-unknown-none" }
+
+[profile.dev]
+panic = "abort"
+debug = true
+opt-level = 3
+
+[profile.release]
+panic = "abort"
+debug = true
+opt-level = 3
