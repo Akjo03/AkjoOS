@@ -97,7 +97,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         internal::memory::init_allocator();
 
         serial_logger.log(format_args!(
-            "Main kernel heap initialized with {} bytes and global allocator switched to it. Stopped at {}/{}.",
+            "Main kernel heap initialized with {} bytes and global allocator switched to it. Stopped at frame {}/{}.",
             internal::memory::MAIN_HEAP_SIZE, next, &usable_region_count
         ), SerialLoggingLevel::Info);
 
