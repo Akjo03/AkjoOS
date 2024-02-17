@@ -5,16 +5,14 @@ use crate::managers::display::{DisplayManager, DisplayMode};
 
 pub struct Kernel<'a> {
     serial_logger: &'a mut SerialPortLogger,
-    display_manager: DisplayManager<'a>,
-    pub running: bool
+    display_manager: DisplayManager<'a>
 } impl<'a> Kernel<'a> {
     pub fn new(
         serial_logger: &'a mut SerialPortLogger,
         display_manager: DisplayManager<'a>
     ) -> Self { Self {
         serial_logger,
-        display_manager,
-        running: true
+        display_manager
     } }
 
     pub fn init(&mut self) {
