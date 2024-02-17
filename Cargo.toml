@@ -6,7 +6,7 @@ resolver = "2"
 name = "test_os"
 version = "0.1.0"
 edition = "2021"
-default-run = "qemu-uefi"
+default-run = "qemu-bios"
 
 [dependencies]
 ovmf-prebuilt = "0.1.0-alpha"

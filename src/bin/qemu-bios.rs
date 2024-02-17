@@ -31,6 +31,8 @@ fn main() {
 
     qemu.arg("-device").arg(format!("VGA,{}", env::var("VGA_OPTIONS").unwrap()));
 
+    qemu.arg("-S");
+
     let exit_status = qemu.status().unwrap();
     process::exit(exit_status.code().unwrap_or(-1));
 }

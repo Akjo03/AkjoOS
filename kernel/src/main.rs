@@ -120,19 +120,11 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                 );
                 kernel.init();
 
+                internal::idt::disable();
                 serial_logger.log(format_args!(
-                    "Kernel initialized. Entering kernel loop..."
+                    "Interrupt descriptor table disabled."
                 ), SerialLoggingLevel::Info);
 
-                let mut tick = 0u64;
-                while kernel.running {
-                    kernel.tick(tick);
-                    tick += 1;
-                }
-
-                serial_logger.log(format_args!(
-                    "Kernel is halting."
-                ), SerialLoggingLevel::Info);
                 kernel.halt();
             } else { panic!("Frame buffer info not found!") }
         } else { panic!("Frame buffer not found!") }
