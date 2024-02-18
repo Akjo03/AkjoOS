@@ -52,7 +52,11 @@ pub struct Kernel<'a> {
     fn on_error(&mut self, error_event: ErrorEvent) {
         match error_event.level() {
             ErrorLevel::Fault => {
+                self.serial_logger.log(&format_args!(
+                    "\nKernel encountered a fault: {}",
+                    error_event.message(),
 
+                ), SerialLoggingLevel::Warning);
             }, ErrorLevel::Abort => {
                 crate::abort(&format!(
                     "\nKernel encountered an unrecoverable error: {}",

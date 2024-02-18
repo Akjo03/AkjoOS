@@ -117,11 +117,10 @@ extern "x86-interrupt" fn page_fault_handler(
 } }
 
 extern "x86-interrupt" fn general_protection_fault_handler(
-    stack_frame: InterruptStackFrame, error_code: u64
+    stack_frame: InterruptStackFrame, _error_code: u64
 ) { if let Some(event_dispatcher) = crate::get_event_dispatcher() {
     let event = Event::Error(ErrorEvent::GeneralProtectionFault(
-        format!("{:#?}", stack_frame),
-        error_code
+        format!("{:#?}", stack_frame)
     ));
 
     event_dispatcher.dispatch(event);

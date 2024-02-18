@@ -12,7 +12,7 @@ pub enum Event {
 #[derive(Debug, Clone)]
 pub enum ErrorEvent {
     PageFault(String),
-    GeneralProtectionFault(String, u64),
+    GeneralProtectionFault(String),
     InvalidOpcode(String),
     InvalidTss(String),
     DoubleFault(String),
@@ -21,7 +21,7 @@ pub enum ErrorEvent {
     pub fn message(&self) -> &String {
         match self {
             Self::PageFault(message) => message,
-            Self::GeneralProtectionFault(message, _) => message,
+            Self::GeneralProtectionFault(message) => message,
             Self::InvalidOpcode(message) => message,
             Self::InvalidTss(message) => message,
             Self::DoubleFault(message) => message,
@@ -29,21 +29,10 @@ pub enum ErrorEvent {
         }
     }
 
-    pub fn error_code(&self) -> Option<u64> {
-        match self {
-            Self::PageFault(_) => None,
-            Self::GeneralProtectionFault(_, error_code) => Some(*error_code),
-            Self::InvalidOpcode(_) => None,
-            Self::InvalidTss(_) => None,
-            Self::DoubleFault(_) => None,
-            Self::Breakpoint(_) => None,
-        }
-    }
-
     pub fn level(&self) -> ErrorLevel {
         match self {
             Self::PageFault(_) => ErrorLevel::Fault,
-            Self::GeneralProtectionFault(_, _) => ErrorLevel::Fault,
+            Self::GeneralProtectionFault(_) => ErrorLevel::Fault,
             Self::InvalidOpcode(_) => ErrorLevel::Fault,
             Self::InvalidTss(_) => ErrorLevel::Fault,
             Self::DoubleFault(_) => ErrorLevel::Abort,
@@ -65,7 +54,7 @@ fn mask_index(event: Event) -> u8 {
     match event {
         Event::TimerInterrupt => 0,
         Event::Error(ErrorEvent::PageFault(_)) => 1,
-        Event::Error(ErrorEvent::GeneralProtectionFault(_, _)) => 2,
+        Event::Error(ErrorEvent::GeneralProtectionFault(_)) => 2,
         Event::Error(ErrorEvent::InvalidOpcode(_)) => 3,
         Event::Error(ErrorEvent::InvalidTss(_)) => 4,
         Event::Error(ErrorEvent::DoubleFault(_)) => 5,
