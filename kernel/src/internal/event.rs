@@ -117,12 +117,6 @@ pub struct EventDispatcher {
     }
 
     pub fn dispatch(&self, event: Event) {
-        if let Some(serial_logger) = crate::get_serial_logger() {
-            serial_logger.log(&format_args!(
-                "Dispatching event {:?}.", event
-            ), SerialLoggingLevel::Info);
-        }
-
         self.handlers.iter()
             .filter(|handler| handler.borrow().mask().read(event.clone()))
             .for_each(|handler| handler.borrow_mut().handle(event.clone()));
