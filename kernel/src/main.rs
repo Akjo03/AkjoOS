@@ -2,6 +2,7 @@
 #![feature(panic_info_message)]
 #![feature(const_mut_refs)]
 #![feature(abi_x86_interrupt)]
+#![feature(asm_const)]
 #![no_std]
 #![no_main]
 
@@ -9,6 +10,7 @@ extern crate alloc;
 
 use alloc::string::String;
 use core::panic::PanicInfo;
+use core::sync::atomic::Ordering;
 use bootloader_api::{BootInfo, BootloaderConfig};
 use bootloader_api::config::Mapping;
 use bootloader_api::info::FrameBufferInfo;
@@ -75,7 +77,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             physical_memory_offset
         ), SerialLoggingLevel::Info);
         serial_logger.log(format_args!(
-            "Detected {} of usable memory regions.",
+            "Detected {} of usable memory regions / frames at 4KiB in size.",
             &usable_region_count
         ), SerialLoggingLevel::Info);
 
@@ -120,12 +122,26 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                 );
                 kernel.init();
 
+                while kernel.running.load(Ordering::Relaxed) {
+                    kernel.tick();
+                    x86_64::instructions::hlt();
+                }
+
+                serial_logger.log(format_args!(
+                    "Kernel needs to stop running. Shutting down..."
+                ), SerialLoggingLevel::Info);
+
                 internal::idt::disable();
                 serial_logger.log(format_args!(
                     "Interrupt descriptor table disabled."
                 ), SerialLoggingLevel::Info);
 
                 kernel.halt();
+                serial_logger.log(format_args!(
+                    "Kernel halted."
+                ), SerialLoggingLevel::Info);
+
+                loop { x86_64::instructions::hlt(); }
             } else { panic!("Frame buffer info not found!") }
         } else { panic!("Frame buffer not found!") }
     } else { panic!("Serial port not found!") }
@@ -167,7 +183,7 @@ fn panic(panic_info: &PanicInfo) -> ! {
         }
     }
 
-    loop {}
+    loop { x86_64::instructions::hlt(); }
 }
 
 // -------- Static Access to Serial Logger --------

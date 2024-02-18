@@ -16,20 +16,26 @@ fn main() {
 
     qemu.arg("-serial").arg("stdio");
 
-    let accel_enabled = env::var("ACCEL_ENABLED").unwrap_or("true".to_string())
+    let accel_enabled = env!("ACCEL_ENABLED").to_string()
         .parse::<bool>().unwrap();
 
     match (env::consts::OS, accel_enabled) {
         ("windows", true) => {
             qemu.arg("-accel").arg("whpx,kernel-irqchip=off");
+            println!("Windows with WHPX enabled.")
         }, ("linux", true) => {
             qemu.arg("-accel").arg("kvm");
+            println!("Linux with KVM enabled.")
         }, ("macos", true) => {
             qemu.arg("-accel").arg("hvf");
+            println!("macOS with HVF enabled.")
         }, _ => {}
     }
 
-    qemu.arg("-device").arg(format!("VGA,{}", env::var("VGA_OPTIONS").unwrap()));
+    qemu.arg("-device").arg(format!("VGA,{}", env!("VGA_OPTIONS")));
+    println!("VGA options: {}", env!("VGA_OPTIONS"));
+    qemu.arg("-m").arg(env!("AVAILABLE_MEMORY"));
+    println!("Available memory: {}", env!("AVAILABLE_MEMORY"));
 
     qemu.arg("-S");
 

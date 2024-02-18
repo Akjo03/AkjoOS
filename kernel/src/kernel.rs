@@ -1,3 +1,4 @@
+use core::sync::atomic::{AtomicBool, Ordering};
 use crate::api::display::Fonts;
 use crate::drivers::display::DisplayDriverType;
 use crate::internal::serial::{SerialLoggingLevel, SerialPortLogger};
@@ -5,14 +6,16 @@ use crate::managers::display::{DisplayManager, DisplayMode};
 
 pub struct Kernel<'a> {
     serial_logger: &'a mut SerialPortLogger,
-    display_manager: DisplayManager<'a>
+    display_manager: DisplayManager<'a>,
+    pub running: AtomicBool
 } impl<'a> Kernel<'a> {
     pub fn new(
         serial_logger: &'a mut SerialPortLogger,
         display_manager: DisplayManager<'a>
     ) -> Self { Self {
         serial_logger,
-        display_manager
+        display_manager,
+        running: AtomicBool::new(true)
     } }
 
     pub fn init(&mut self) {
@@ -32,10 +35,9 @@ pub struct Kernel<'a> {
         self.display_manager.draw_all();
     }
 
-    pub fn halt(&mut self) -> ! {
-        self.serial_logger.log(format_args!(
-            "Kernel is halting the system."
-        ), SerialLoggingLevel::Info);
-        loop {}
+    pub fn tick(&mut self) {
+        self.running.store(false, Ordering::Relaxed);
     }
+
+    pub fn halt(&mut self) {}
 }

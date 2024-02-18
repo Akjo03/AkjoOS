@@ -18,10 +18,12 @@ fn main() {
     disk_builder.create_bios_image(&bios_path).unwrap();
 
     let vga_options = "vgamem_mb=64,xres=1280,yres=720";
+    let available_memory = "128M";
     let accel_enabled = "true";
 
     println!("cargo:rustc-env=UEFI_IMAGE={}", uefi_path.display());
     println!("cargo:rustc-env=BIOS_IMAGE={}", bios_path.display());
     println!("cargo:rustc-env=VGA_OPTIONS={}", vga_options);
+    println!("cargo:rustc-env=AVAILABLE_MEMORY={}", available_memory);
     println!("cargo:rustc-env=ACCEL_ENABLED={}", accel_enabled);
 }
