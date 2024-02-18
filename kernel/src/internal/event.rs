@@ -2,7 +2,6 @@ use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cell::RefCell;
-use crate::internal::serial::SerialLoggingLevel;
 
 #[derive(Debug, Clone)]
 pub enum Event {
