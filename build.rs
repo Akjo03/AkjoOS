@@ -5,8 +5,8 @@ fn main() {
     let kernel_path = env::var("CARGO_BIN_FILE_KERNEL").unwrap();
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let uefi_path = out_dir.join("test_os-uefi.img");
-    let bios_path = out_dir.join("test_os-bios.img");
+    let uefi_path = out_dir.join("akjo_os-uefi.img");
+    let bios_path = out_dir.join("akjo_os-bios.img");
 
     let mut boot_config = BootConfig::default();
     boot_config.frame_buffer_logging = false;
