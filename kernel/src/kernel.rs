@@ -23,7 +23,7 @@ pub struct Kernel<'a> {
     } }
 
     pub fn init(&mut self) {
-        self.display_manager.set_mode(DisplayMode::Text(Fonts::Font10x20));
+        self.display_manager.set_mode(DisplayMode::Text(Fonts::Font9x18B));
 
         self.serial_logger.log(&format_args!(
             "Kernel told display manager to use display mode {}.",

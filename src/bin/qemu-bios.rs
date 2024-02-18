@@ -32,7 +32,7 @@ fn main() {
         }, _ => {}
     }
 
-    qemu.arg("-device").arg(format!("qxl-vga,{}", env!("VGA_OPTIONS")));
+    qemu.arg("-device").arg(format!("VGA,{}", env!("VGA_OPTIONS")));
     println!("VGA options: {}", env!("VGA_OPTIONS"));
     qemu.arg("-m").arg(env!("AVAILABLE_MEMORY"));
     println!("Available memory: {}", env!("AVAILABLE_MEMORY"));
