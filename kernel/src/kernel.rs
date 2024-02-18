@@ -55,7 +55,6 @@ pub struct Kernel<'a> {
                 self.serial_logger.log(&format_args!(
                     "\nKernel encountered a fault: {}",
                     error_event.message(),
-
                 ), SerialLoggingLevel::Warning);
             }, ErrorLevel::Abort => {
                 crate::abort(&format!(
