@@ -1,7 +1,6 @@
-use alloc::format;
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use crate::api::display::Fonts;
-use crate::drivers::display::DisplayDriverType;
+use crate::internal::event::{Event, EventHandler, EventMask};
 use crate::internal::serial::{SerialLoggingLevel, SerialPortLogger};
 use crate::managers::display::{DisplayManager, DisplayMode};
 
@@ -30,24 +29,20 @@ pub struct Kernel<'a> {
         ), SerialLoggingLevel::Info);
     }
 
-    pub fn tick(&mut self) {
-        match self.display_manager.get_driver() {
-            DisplayDriverType::Text(driver, _) => {
-                driver.clear_buffer();
-
-                driver.write_string(format!(
-                    "C:\\> Hello, world! Kernel is at tick {}.",
-                    self.tick.load(Ordering::Relaxed)
-                ).as_str())
-            }, _ => {}
-        }
-
-        self.display_manager.draw_all();
-
-        if self.tick.load(Ordering::Relaxed) >= 10 {
-            self.running.store(false, Ordering::Relaxed);
-        }
+    fn tick(&mut self) {
+        self.running.store(false, Ordering::Relaxed);
     }
 
     pub fn halt(&mut self) {}
+} impl EventHandler for Kernel<'_> {
+    fn handle(&mut self, event: Event) {
+        match event {
+            Event::TimerInterrupt => {
+                self.tick.fetch_add(1, Ordering::Relaxed);
+                self.tick();
+            }, _ => {}
+        }
+    }
+
+    fn mask(&self) -> EventMask { EventMask::all() }
 }

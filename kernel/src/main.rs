@@ -8,7 +8,9 @@
 
 extern crate alloc;
 
+use alloc::rc::Rc;
 use alloc::string::String;
+use core::cell::RefCell;
 use core::panic::PanicInfo;
 use core::sync::atomic::Ordering;
 use bootloader_api::{BootInfo, BootloaderConfig};
@@ -16,6 +18,7 @@ use bootloader_api::config::Mapping;
 use bootloader_api::info::FrameBufferInfo;
 use x86_64::VirtAddr;
 use crate::drivers::display::DisplayDriverType;
+use crate::internal::event::{EventDispatcher, EventHandler};
 use crate::internal::memory::SimpleBootInfoFrameAllocator;
 use crate::internal::serial::{SerialLoggingLevel, SerialPortLogger};
 use crate::kernel::Kernel;
@@ -103,6 +106,11 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             internal::memory::MAIN_HEAP_SIZE, next, &usable_region_count
         ), SerialLoggingLevel::Info);
 
+        init_event_dispatcher();
+        serial_logger.log(format_args!(
+            "Event dispatcher initialized."
+        ), SerialLoggingLevel::Info);
+
         if let Some(frame_buffer) = get_framebuffer() {
             if let Some(frame_buffer_info) = get_framebuffer_info() {
                 let mut display_manager = DisplayManager::new(
@@ -116,16 +124,19 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                     display_manager.get_display_mode(), display_manager.get_display_type()
                 ), SerialLoggingLevel::Info);
 
-                let mut kernel = Kernel::new(
+                let kernel = Rc::new(RefCell::new(Kernel::new(
                     get_serial_logger().unwrap(),
                     display_manager
-                );
-                kernel.init();
+                )));
 
-                while kernel.running.load(Ordering::Relaxed) {
-                    kernel.tick.fetch_add(1, Ordering::Relaxed);
-                    kernel.tick();
-                    x86_64::instructions::hlt();
+                kernel.borrow_mut().init();
+
+                if let Some(event_dispatcher) = get_event_dispatcher() {
+                    event_dispatcher.register(Rc::clone(&kernel) as Rc<RefCell<dyn EventHandler>>);
+
+                    while kernel.borrow().running.load(Ordering::Relaxed) {
+                        x86_64::instructions::hlt();
+                    }
                 }
 
                 serial_logger.log(format_args!(
@@ -137,7 +148,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                     "Interrupt descriptor table disabled."
                 ), SerialLoggingLevel::Info);
 
-                kernel.halt();
+                kernel.borrow_mut().halt();
                 serial_logger.log(format_args!(
                     "Kernel halted."
                 ), SerialLoggingLevel::Info);
@@ -195,7 +206,6 @@ fn init_serial_logger() { unsafe {
     SERIAL_LOGGER = Some(SerialPortLogger::init());
 } }
 
-#[allow(dead_code)]
 fn get_serial_logger() -> Option<&'static mut SerialPortLogger> {
     unsafe { SERIAL_LOGGER.as_mut() }
 }
@@ -216,4 +226,16 @@ fn get_framebuffer() -> Option<&'static mut [u8]> {
 
 fn get_framebuffer_info() -> Option<FrameBufferInfo> {
     unsafe { FRAMEBUFFER_INFO }
+}
+
+// -------- Static Access to Event Dispatcher --------
+
+static mut EVENT_DISPATCHER: Option<EventDispatcher> = None;
+
+fn init_event_dispatcher() { unsafe {
+    EVENT_DISPATCHER = Some(EventDispatcher::new());
+} }
+
+fn get_event_dispatcher() -> Option<&'static mut EventDispatcher> {
+    unsafe { EVENT_DISPATCHER.as_mut() }
 }

@@ -1,6 +1,7 @@
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
+use crate::internal::event::{ErrorEvent, Event};
 use crate::internal::serial::SerialLoggingLevel;
 
 #[derive(Debug, Clone, Copy)]
@@ -64,6 +65,12 @@ pub fn disable() {
 extern "x86-interrupt" fn timer_interrupt_handler(
     _stack_frame: InterruptStackFrame
 ) {
+    if let Some(event_dispatcher) = crate::get_event_dispatcher() {
+        let event = Event::TimerInterrupt;
+
+        event_dispatcher.dispatch(event);
+    }
+
     unsafe { PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer.as_u8()) };
 }
 
@@ -75,7 +82,13 @@ extern "x86-interrupt" fn breakpoint_handler(
     serial_logger.log(format_args!(
         "Breakpoint exception occurred: {:#?}",
         stack_frame
-    ), SerialLoggingLevel::Error)
+    ), SerialLoggingLevel::Error);
+
+    if let Some(event_dispatcher) = crate::get_event_dispatcher() {
+        let event = Event::Error(ErrorEvent::Breakpoint);
+
+        event_dispatcher.dispatch(event);
+    }
 } }
 
 extern "x86-interrupt" fn invalid_opcode_handler(
@@ -84,7 +97,13 @@ extern "x86-interrupt" fn invalid_opcode_handler(
     serial_logger.log(format_args!(
         "Invalid opcode exception occurred: {:#?}",
         stack_frame
-    ), SerialLoggingLevel::Error)
+    ), SerialLoggingLevel::Error);
+
+    if let Some(event_dispatcher) = crate::get_event_dispatcher() {
+        let event = Event::Error(ErrorEvent::InvalidOpcode);
+
+        event_dispatcher.dispatch(event);
+    }
 } }
 
 extern "x86-interrupt" fn invalid_tss_handler(
@@ -93,7 +112,13 @@ extern "x86-interrupt" fn invalid_tss_handler(
     serial_logger.log(format_args!(
         "Invalid TSS exception occurred with error code {:#?}: {:#?}",
         error_code, stack_frame
-    ), SerialLoggingLevel::Error)
+    ), SerialLoggingLevel::Error);
+
+    if let Some(event_dispatcher) = crate::get_event_dispatcher() {
+        let event = Event::Error(ErrorEvent::InvalidTss);
+
+        event_dispatcher.dispatch(event);
+    }
 } }
 
 extern "x86-interrupt" fn page_fault_handler(
@@ -102,7 +127,13 @@ extern "x86-interrupt" fn page_fault_handler(
     serial_logger.log(format_args!(
         "Page fault exception occurred with error code {:#?}: {:#?}",
         error_code, stack_frame
-    ), SerialLoggingLevel::Error)
+    ), SerialLoggingLevel::Error);
+
+    if let Some(event_dispatcher) = crate::get_event_dispatcher() {
+        let event = Event::Error(ErrorEvent::PageFault);
+
+        event_dispatcher.dispatch(event);
+    }
 } }
 
 extern "x86-interrupt" fn general_protection_fault_handler(
@@ -111,7 +142,13 @@ extern "x86-interrupt" fn general_protection_fault_handler(
     serial_logger.log(format_args!(
         "General protection fault exception occurred with error code {:#?}: {:#?}",
         error_code, stack_frame
-    ), SerialLoggingLevel::Error)
+    ), SerialLoggingLevel::Error);
+
+    if let Some(event_dispatcher) = crate::get_event_dispatcher() {
+        let event = Event::Error(ErrorEvent::GeneralProtectionFault);
+
+        event_dispatcher.dispatch(event);
+    }
 } }
 
 extern "x86-interrupt" fn double_fault_handler(
@@ -120,5 +157,11 @@ extern "x86-interrupt" fn double_fault_handler(
     serial_logger.log(format_args!(
         "Double fault exception occurred: {:#?}",
         stack_frame
-    ), SerialLoggingLevel::Error)
+    ), SerialLoggingLevel::Error);
+
+    if let Some(event_dispatcher) = crate::get_event_dispatcher() {
+        let event = Event::Error(ErrorEvent::DoubleFault);
+
+        event_dispatcher.dispatch(event);
+    }
 } loop {} }
