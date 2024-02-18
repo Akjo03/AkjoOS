@@ -17,8 +17,8 @@ fn main() {
     disk_builder.create_uefi_image(&uefi_path).unwrap();
     disk_builder.create_bios_image(&bios_path).unwrap();
 
-    let vga_options = "vgamem_mb=64,xres=1280,yres=720";
-    let available_memory = "128M";
+    let vga_options = "vram_size_mb=64,xres=1920,yres=1080";
+    let available_memory = "256M";
     let accel_enabled = "true";
 
     println!("cargo:rustc-env=UEFI_IMAGE={}", uefi_path.display());
