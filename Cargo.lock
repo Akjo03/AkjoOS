@@ -594,6 +594,7 @@ dependencies = [
  "lazy_static",
  "linked_list_allocator",
  "log",
+ "pc-keyboard",
  "pic8259",
  "spin 0.9.8",
  "uart_16550",
@@ -704,6 +705,12 @@ name = "parking"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb813b8af86854136c6922af0598d719255ecb2179515e6e7730d468f05c9cae"
+
+[[package]]
+name = "pc-keyboard"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed089a1fbffe3337a1a345501c981f1eb1e47e69de5a40e852433e12953c3174"
 
 [[package]]
 name = "pic8259"

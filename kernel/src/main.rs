@@ -17,7 +17,7 @@ use bootloader_api::config::Mapping;
 use bootloader_api::info::FrameBufferInfo;
 use x86_64::VirtAddr;
 use crate::drivers::display::DisplayDriverType;
-use crate::internal::event::{EventDispatcher, EventHandler};
+use crate::internal::event::{Event, EventDispatcher, EventHandler};
 use crate::internal::memory::SimpleBootInfoFrameAllocator;
 use crate::internal::serial::{SerialLoggingLevel, SerialPortLogger};
 use crate::kernel::Kernel;
@@ -201,6 +201,21 @@ fn abort(message: &str, display_manager: Option<&mut DisplayManager>) -> ! {
     }
 
     loop { x86_64::instructions::hlt(); }
+}
+
+// -------- "Hidden" Event Handler Implementation for Kernel --------
+
+impl EventHandler for Kernel<'_> {
+    fn handle(&mut self, event: Event) {
+        match event {
+            Event::TimerInterrupt => {
+                self.tick.fetch_add(1, Ordering::Relaxed);
+                self.tick();
+            }, Event::Error(event) => {
+                self.on_error(event);
+            }, _ => {}
+        }
+    }
 }
 
 // -------- Static Access to Serial Logger --------

@@ -2,7 +2,7 @@ use alloc::format;
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use crate::api::display::Fonts;
 use crate::drivers::display::DisplayDriverType;
-use crate::internal::event::{ErrorEvent, ErrorLevel, Event, EventHandler, EventMask};
+use crate::internal::event::{ErrorEvent, ErrorLevel};
 use crate::internal::serial::{SerialLoggingLevel, SerialPortLogger};
 use crate::managers::display::{DisplayManager, DisplayMode};
 
@@ -31,7 +31,7 @@ pub struct Kernel<'a> {
         ), SerialLoggingLevel::Info);
     }
 
-    fn tick(&mut self) {
+    pub fn tick(&mut self) {
         match self.display_manager.get_driver() {
             DisplayDriverType::Text(driver, _) => {
                 driver.clear_buffer();
@@ -49,7 +49,7 @@ pub struct Kernel<'a> {
         }
     }
 
-    fn on_error(&mut self, error_event: ErrorEvent) {
+    pub fn on_error(&mut self, error_event: ErrorEvent) {
         match error_event.level() {
             ErrorLevel::Fault => {
                 self.serial_logger.log(&format_args!(
@@ -66,17 +66,4 @@ pub struct Kernel<'a> {
     }
 
     pub fn halt(&mut self) {}
-} impl EventHandler for Kernel<'_> {
-    fn handle(&mut self, event: Event) {
-        match event {
-            Event::TimerInterrupt => {
-                self.tick.fetch_add(1, Ordering::Relaxed);
-                self.tick();
-            }, Event::Error(event) => {
-                self.on_error(event);
-            }
-        }
-    }
-
-    fn mask(&self) -> EventMask { EventMask::all() }
 }
