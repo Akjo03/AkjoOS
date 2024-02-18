@@ -82,10 +82,10 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
     use x86_64::instructions::port::Port;
 
     let mut port = Port::new(0x60);
-    let _scancode: u8 = unsafe { port.read() };
+    let scancode: u8 = unsafe { port.read() };
 
     if let Some(event_dispatcher) = crate::get_event_dispatcher() {
-        let event = Event::KeyboardInterrupt;
+        let event = Event::KeyboardInterrupt(scancode);
 
         event_dispatcher.dispatch(event);
     }
