@@ -2,7 +2,6 @@
 #![feature(panic_info_message)]
 #![feature(const_mut_refs)]
 #![feature(abi_x86_interrupt)]
-#![feature(asm_const)]
 #![no_std]
 #![no_main]
 
@@ -44,17 +43,17 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     init_serial_logger();
 
     if let Some(serial_logger) = get_serial_logger() {
-        serial_logger.log(format_args!(
+        serial_logger.log(&format_args!(
             "Serial port initialized. Booting kernel of AkjoOS..."
         ), SerialLoggingLevel::Info);
 
         internal::gdt::init();
-        serial_logger.log(format_args!(
+        serial_logger.log(&format_args!(
             "Global descriptor table initialized."
         ), SerialLoggingLevel::Info);
 
         internal::idt::init();
-        serial_logger.log(format_args!(
+        serial_logger.log(&format_args!(
             "Interrupt descriptor table initialized."
         ), SerialLoggingLevel::Info);
 
@@ -63,7 +62,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             let buffer = frame_buffer.buffer_mut();
             initialize_frame_buffer(buffer, info);
 
-            serial_logger.log(format_args!(
+            serial_logger.log(&format_args!(
                 "Frame buffer initialized with resolution {}x{} at {}bpp.",
                 info.width, info.height, info.bytes_per_pixel * 8
             ), SerialLoggingLevel::Info);
@@ -75,11 +74,11 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         let mut mapper = unsafe { internal::memory::init(physical_memory_offset) };
         let usable_region_count = &internal::memory::get_usable_regions(&boot_info.memory_regions, 0).count();
 
-        serial_logger.log(format_args!(
+        serial_logger.log(&format_args!(
             "Memory mapper initialized at physical memory offset {:?}.",
             physical_memory_offset
         ), SerialLoggingLevel::Info);
-        serial_logger.log(format_args!(
+        serial_logger.log(&format_args!(
             "Detected {} of usable memory regions / frames at 4KiB in size.",
             &usable_region_count
         ), SerialLoggingLevel::Info);
@@ -89,7 +88,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         };
         let next = internal::memory::init_initial_heap(&mut mapper, &mut simple_frame_allocator)
             .expect("Failed to initialize initial heap!");
-        serial_logger.log(format_args!(
+        serial_logger.log(&format_args!(
             "Initial heap initialized with {} bytes. Next frame at {}/{}.",
             internal::memory::INITIAL_HEAP_SIZE, next, &usable_region_count
         ), SerialLoggingLevel::Info);
@@ -101,13 +100,13 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             .expect("Failed to initialize main heap!");
         internal::memory::init_allocator();
 
-        serial_logger.log(format_args!(
+        serial_logger.log(&format_args!(
             "Main kernel heap initialized with {} bytes and global allocator switched to it. Stopped at frame {}/{}.",
             internal::memory::MAIN_HEAP_SIZE, next, &usable_region_count
         ), SerialLoggingLevel::Info);
 
         init_event_dispatcher();
-        serial_logger.log(format_args!(
+        serial_logger.log(&format_args!(
             "Event dispatcher initialized."
         ), SerialLoggingLevel::Info);
 
@@ -119,7 +118,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                 display_manager.set_mode(DisplayMode::Dummy);
                 display_manager.clear_screen();
 
-                serial_logger.log(format_args!(
+                serial_logger.log(&format_args!(
                     "Display manager initialized using display mode {} and type {}.",
                     display_manager.get_display_mode(), display_manager.get_display_type()
                 ), SerialLoggingLevel::Info);
@@ -139,17 +138,17 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                     }
                 }
 
-                serial_logger.log(format_args!(
+                serial_logger.log(&format_args!(
                     "Kernel needs to stop running. Shutting down..."
                 ), SerialLoggingLevel::Info);
 
                 internal::idt::disable();
-                serial_logger.log(format_args!(
+                serial_logger.log(&format_args!(
                     "Interrupt descriptor table disabled."
                 ), SerialLoggingLevel::Info);
 
                 kernel.borrow_mut().halt();
-                serial_logger.log(format_args!(
+                serial_logger.log(&format_args!(
                     "Kernel halted."
                 ), SerialLoggingLevel::Info);
 
@@ -161,38 +160,44 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
 #[panic_handler]
 fn panic(panic_info: &PanicInfo) -> ! {
-    if let Some(serial_port) = get_serial_logger() {
-        serial_port.log(format_args!("{:?}", panic_info.payload()), SerialLoggingLevel::Panic);
-    }
+    let payload_message = if let Some(message) = panic_info.message() {
+        message.as_str().unwrap_or("Unknown panic message.")
+    } else if let Some(payload) = panic_info.payload().downcast_ref::<&str>() {
+        payload
+    } else if let Some(payload) = panic_info.payload().downcast_ref::<String>() {
+        payload.as_str()
+    } else {
+        "Unknown panic payload."
+    };
 
     if let Some(frame_buffer) = get_framebuffer() {
         if let Some(frame_buffer_info) = get_framebuffer_info() {
-            let mut display_manager = DisplayManager::new(DisplayType::Simple, frame_buffer, frame_buffer_info);
+            let mut display_manager = DisplayManager::new(
+                DisplayType::Buffered, frame_buffer, frame_buffer_info
+            );
             display_manager.set_mode(DisplayMode::Dummy);
+            display_manager.clear_screen();
 
-            match display_manager.get_driver() {
-                DisplayDriverType::Dummy(driver) => {
-                    let mut message_found = false;
-
-                    if let Some(payload) = panic_info.payload().downcast_ref::<&str>() {
-                        driver.draw_panic(payload);
-                        message_found = true;
-                    } else if let Some(payload) = panic_info.payload().downcast_ref::<String>() {
-                        driver.draw_panic(payload.as_str());
-                        message_found = true;
-                    } else if let Some(message) = panic_info.message() {
-                        if let Some(message_str) = message.as_str() {
-                            driver.draw_panic(message_str);
-                            message_found = true;
-                        }
-                    }
-
-                    if !message_found {
-                        driver.draw_panic("No message provided!");
-                    }
-                }, _ => {}
-            }
+            abort(payload_message, Some(&mut display_manager));
         }
+    }
+
+    abort(payload_message, None);
+}
+
+fn abort(message: &str, display_manager: Option<&mut DisplayManager>) -> ! {
+    if let Some(serial_port) = get_serial_logger() {
+        serial_port.log(&format_args!("{}", message), SerialLoggingLevel::Panic);
+    }
+
+    if let Some(display_manager) = display_manager {
+        display_manager.set_mode(DisplayMode::Dummy);
+        match display_manager.get_driver() {
+            DisplayDriverType::Dummy(driver) => {
+                driver.draw_panic(message);
+            }, _ => {}
+        }
+        display_manager.draw_all();
     }
 
     loop { x86_64::instructions::hlt(); }

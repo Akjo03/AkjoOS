@@ -30,7 +30,7 @@ pub struct SerialPortLogger {
         Self { port }
     }
 
-    pub fn log(&mut self, args: fmt::Arguments, level: SerialLoggingLevel) {
+    pub fn log(&mut self, args: &fmt::Arguments, level: SerialLoggingLevel) {
         self.port.write_fmt(
             format_args!("\n[{}]: {}", level.as_str(), args)
         ).unwrap();

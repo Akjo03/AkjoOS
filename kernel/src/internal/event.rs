@@ -1,33 +1,76 @@
 use alloc::rc::Rc;
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 use crate::internal::serial::SerialLoggingLevel;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Event {
     TimerInterrupt,
     Error(ErrorEvent),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum ErrorEvent {
-    PageFault,
-    GeneralProtectionFault,
-    InvalidOpcode,
-    InvalidTss,
-    DoubleFault,
-    Breakpoint,
+    PageFault(String),
+    GeneralProtectionFault(String, u64),
+    InvalidOpcode(String),
+    InvalidTss(String),
+    DoubleFault(String),
+    Breakpoint(String),
+} #[allow(dead_code)] impl ErrorEvent {
+    pub fn message(&self) -> &String {
+        match self {
+            Self::PageFault(message) => message,
+            Self::GeneralProtectionFault(message, _) => message,
+            Self::InvalidOpcode(message) => message,
+            Self::InvalidTss(message) => message,
+            Self::DoubleFault(message) => message,
+            Self::Breakpoint(message) => message,
+        }
+    }
+
+    pub fn error_code(&self) -> Option<u64> {
+        match self {
+            Self::PageFault(_) => None,
+            Self::GeneralProtectionFault(_, error_code) => Some(*error_code),
+            Self::InvalidOpcode(_) => None,
+            Self::InvalidTss(_) => None,
+            Self::DoubleFault(_) => None,
+            Self::Breakpoint(_) => None,
+        }
+    }
+
+    pub fn level(&self) -> ErrorLevel {
+        match self {
+            Self::PageFault(_) => ErrorLevel::Fault,
+            Self::GeneralProtectionFault(_, _) => ErrorLevel::Fault,
+            Self::InvalidOpcode(_) => ErrorLevel::Fault,
+            Self::InvalidTss(_) => ErrorLevel::Fault,
+            Self::DoubleFault(_) => ErrorLevel::Abort,
+            Self::Breakpoint(_) => ErrorLevel::Trap,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub enum ErrorLevel {
+    Interrupt,
+    Trap,
+    Fault,
+    Abort,
 }
 
 fn mask_index(event: Event) -> u8 {
     match event {
         Event::TimerInterrupt => 0,
-        Event::Error(ErrorEvent::PageFault) => 1,
-        Event::Error(ErrorEvent::GeneralProtectionFault) => 2,
-        Event::Error(ErrorEvent::InvalidOpcode) => 3,
-        Event::Error(ErrorEvent::InvalidTss) => 4,
-        Event::Error(ErrorEvent::DoubleFault) => 5,
-        Event::Error(ErrorEvent::Breakpoint) => 6,
+        Event::Error(ErrorEvent::PageFault(_)) => 1,
+        Event::Error(ErrorEvent::GeneralProtectionFault(_, _)) => 2,
+        Event::Error(ErrorEvent::InvalidOpcode(_)) => 3,
+        Event::Error(ErrorEvent::InvalidTss(_)) => 4,
+        Event::Error(ErrorEvent::DoubleFault(_)) => 5,
+        Event::Error(ErrorEvent::Breakpoint(_)) => 6,
     }
 }
 
@@ -75,13 +118,13 @@ pub struct EventDispatcher {
 
     pub fn dispatch(&self, event: Event) {
         if let Some(serial_logger) = crate::get_serial_logger() {
-            serial_logger.log(format_args!(
+            serial_logger.log(&format_args!(
                 "Dispatching event {:?}.", event
             ), SerialLoggingLevel::Info);
         }
 
         self.handlers.iter()
-            .filter(|handler| handler.borrow().mask().read(event))
-            .for_each(|handler| handler.borrow_mut().handle(event));
+            .filter(|handler| handler.borrow().mask().read(event.clone()))
+            .for_each(|handler| handler.borrow_mut().handle(event.clone()));
     }
 }
