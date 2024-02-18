@@ -123,6 +123,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                 kernel.init();
 
                 while kernel.running.load(Ordering::Relaxed) {
+                    kernel.tick.fetch_add(1, Ordering::Relaxed);
                     kernel.tick();
                     x86_64::instructions::hlt();
                 }
