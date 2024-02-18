@@ -12,7 +12,7 @@ default-run = "qemu-bios"
 ovmf-prebuilt = "0.1.0-alpha"
 
 [build-dependencies]
-bootloader = "0.11.6"
+bootloader = "0.11.7"
 kernel = { path = "kernel", artifact = "bin", target = "x86_64-unknown-none" }
 
 [profile.dev]
