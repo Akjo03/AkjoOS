@@ -12,6 +12,7 @@ use alloc::string::String;
 use core::cell::RefCell;
 use core::panic::PanicInfo;
 use core::sync::atomic::Ordering;
+use acpi::madt::Madt;
 use bootloader_api::{BootInfo, BootloaderConfig};
 use bootloader_api::config::Mapping;
 use bootloader_api::info::FrameBufferInfo;
@@ -40,6 +41,7 @@ const BOOTLOADER_CONFIG: BootloaderConfig = {
 bootloader_api::entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
 
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
+    // Initialize serial logger
     init_serial_logger();
 
     if let Some(serial_logger) = get_serial_logger() {
@@ -47,6 +49,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             "Serial port initialized. Booting kernel of AkjoOS..."
         ), SerialLoggingLevel::Info);
 
+        // Initialize memory mapper
         let physical_memory_offset = boot_info.physical_memory_offset.as_ref()
             .expect("Physical memory offset not found!");
         let physical_memory_offset = VirtAddr::new(*physical_memory_offset);
@@ -61,16 +64,34 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             &usable_region_count
         ), SerialLoggingLevel::Info);
 
+        // Load ACPI tables
+        let acpi_tables = internal::acpi::load(Option::from(boot_info.rsdp_addr), physical_memory_offset);
+        serial_logger.log(&format_args!(
+            "ACPI tables loaded."
+        ), SerialLoggingLevel::Info);
+
+        // Load MADT table
+        let madt = acpi_tables.find_table::<Madt>()
+            .expect("MADT table not found!");
+        let apic_addr = madt.local_apic_address;
+        serial_logger.log(&format_args!(
+            "MADT table found with local APIC address {:#X}.",
+            apic_addr
+        ), SerialLoggingLevel::Info);
+
+        // Load GDT table
         internal::gdt::load();
         serial_logger.log(&format_args!(
             "Global descriptor table loaded."
         ), SerialLoggingLevel::Info);
 
+        // Load IDT table
         internal::idt::load();
         serial_logger.log(&format_args!(
             "Interrupt descriptor table loaded."
         ), SerialLoggingLevel::Info);
 
+        // Setup Frame Buffer
         if let Some(frame_buffer) = boot_info.framebuffer.as_mut() {
             let info = frame_buffer.info().clone();
             let buffer = frame_buffer.buffer_mut();
@@ -82,46 +103,50 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             ), SerialLoggingLevel::Info);
         } else { panic!("Frame buffer not found!") }
 
-        let mut simple_frame_allocator = unsafe {
+        // Initialize simple heap allocator
+        let mut simple_heap_allocator = unsafe {
             SimpleHeapFrameAllocator::new(&boot_info.memory_regions, 0)
         };
-        let next = internal::memory::init_initial_heap(&mut mapper, &mut simple_frame_allocator)
+        let next = internal::memory::init_initial_heap(&mut mapper, &mut simple_heap_allocator)
             .expect("Failed to initialize initial heap!");
         serial_logger.log(&format_args!(
             "Initial heap initialized with {} bytes. Next frame at {}/{}.",
             internal::memory::INITIAL_HEAP_SIZE, next, &usable_region_count
         ), SerialLoggingLevel::Info);
 
+        // Initialize main heap allocator
         let mut frame_allocator = unsafe {
             internal::memory::HeapFrameAllocator::new(&boot_info.memory_regions, next)
         };
         let next = internal::memory::init_main_heap(&mut mapper, &mut frame_allocator)
             .expect("Failed to initialize main heap!");
         internal::memory::init_allocator();
-
         serial_logger.log(&format_args!(
             "Main kernel heap initialized with {} bytes and global allocator switched to it. Stopped at frame {}/{}.",
             internal::memory::MAIN_HEAP_SIZE, next, &usable_region_count
         ), SerialLoggingLevel::Info);
 
+        // Initialize event dispatcher
         init_event_dispatcher();
         serial_logger.log(&format_args!(
             "Event dispatcher initialized."
         ), SerialLoggingLevel::Info);
 
+        // Initialize and run kernel
         if let Some(frame_buffer) = get_framebuffer() {
             if let Some(frame_buffer_info) = get_framebuffer_info() {
+                // Initialize display manager
                 let mut display_manager = DisplayManager::new(
                     DisplayType::Buffered, frame_buffer, frame_buffer_info
                 );
                 display_manager.set_mode(DisplayMode::Dummy);
                 display_manager.clear_screen();
-
                 serial_logger.log(&format_args!(
                     "Display manager initialized using display mode {} and type {}.",
                     display_manager.get_display_mode(), display_manager.get_display_type()
                 ), SerialLoggingLevel::Info);
 
+                // Create kernel instance
                 let kernel = Rc::new(RefCell::new(Kernel::new(
                     get_serial_logger().unwrap(),
                     display_manager
@@ -129,6 +154,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
                 kernel.borrow_mut().init();
 
+                // Main kernel loop and register event handler
                 if let Some(event_dispatcher) = get_event_dispatcher() {
                     event_dispatcher.register(Rc::clone(&kernel) as Rc<RefCell<dyn EventHandler>>);
 
@@ -141,16 +167,19 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                     "Kernel needs to stop running. Shutting down..."
                 ), SerialLoggingLevel::Info);
 
+                // Unload IDT table
                 internal::idt::unload();
                 serial_logger.log(&format_args!(
                     "Interrupt descriptor table unloaded."
                 ), SerialLoggingLevel::Info);
 
+                // Halt kernel
                 kernel.borrow_mut().halt();
                 serial_logger.log(&format_args!(
                     "Kernel halted."
                 ), SerialLoggingLevel::Info);
 
+                // Loop forever
                 loop { x86_64::instructions::hlt(); }
             } else { panic!("Frame buffer info not found!") }
         } else { panic!("Frame buffer not found!") }
