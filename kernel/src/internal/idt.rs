@@ -1,10 +1,7 @@
 use alloc::format;
-use alloc::vec::Vec;
 use lazy_static::lazy_static;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
-use x86_64::VirtAddr;
 use crate::internal::event::{ErrorEvent, Event};
-use crate::internal::madt::IoApic;
 
 lazy_static! {
     static ref IDT: InterruptDescriptorTable = {
@@ -28,7 +25,7 @@ lazy_static! {
     };
 }
 
-pub fn load(_local_apic_addr: VirtAddr, _io_apics: Vec<&IoApic>) {
+pub fn load() {
     IDT.load();
 }
 

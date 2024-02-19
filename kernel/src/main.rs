@@ -113,7 +113,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         ), SerialLoggingLevel::Info);
 
         // Load IDT table
-        internal::idt::load(local_apic_addr, io_apics);
+        internal::idt::load();
         serial_logger.log(&format_args!(
             "Interrupt descriptor table loaded."
         ), SerialLoggingLevel::Info);
