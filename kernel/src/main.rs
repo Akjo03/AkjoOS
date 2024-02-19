@@ -208,9 +208,12 @@ fn abort(message: &str, display_manager: Option<&mut DisplayManager>) -> ! {
 impl EventHandler for Kernel<'_> {
     fn handle(&mut self, event: Event) {
         match event {
-            Event::Error(event) => {
+            Event::TimerInterrupt => {
+                self.tick.fetch_add(1, Ordering::Relaxed);
+                self.tick();
+            }, Event::Error(event) => {
                 self.on_error(event);
-            }
+            }, _ => {}
         }
     }
 }
