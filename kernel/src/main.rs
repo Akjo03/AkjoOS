@@ -47,6 +47,20 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             "Serial port initialized. Booting kernel of AkjoOS..."
         ), SerialLoggingLevel::Info);
 
+        let physical_memory_offset = boot_info.physical_memory_offset.as_ref()
+            .expect("Physical memory offset not found!");
+        let physical_memory_offset = VirtAddr::new(*physical_memory_offset);
+        let mut mapper = unsafe { internal::memory::init(physical_memory_offset) };
+        let usable_region_count = &internal::memory::get_usable_regions(&boot_info.memory_regions, 0).count();
+        serial_logger.log(&format_args!(
+            "Memory mapper initialized at physical memory offset {:?}.",
+            physical_memory_offset
+        ), SerialLoggingLevel::Info);
+        serial_logger.log(&format_args!(
+            "Detected {} of usable memory regions / frames at 4KiB in size.",
+            &usable_region_count
+        ), SerialLoggingLevel::Info);
+
         internal::gdt::load();
         serial_logger.log(&format_args!(
             "Global descriptor table loaded."
@@ -67,21 +81,6 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                 info.width, info.height, info.bytes_per_pixel * 8
             ), SerialLoggingLevel::Info);
         } else { panic!("Frame buffer not found!") }
-
-        let physical_memory_offset = boot_info.physical_memory_offset.as_ref()
-            .expect("Physical memory offset not found!");
-        let physical_memory_offset = VirtAddr::new(*physical_memory_offset);
-        let mut mapper = unsafe { internal::memory::init(physical_memory_offset) };
-        let usable_region_count = &internal::memory::get_usable_regions(&boot_info.memory_regions, 0).count();
-
-        serial_logger.log(&format_args!(
-            "Memory mapper initialized at physical memory offset {:?}.",
-            physical_memory_offset
-        ), SerialLoggingLevel::Info);
-        serial_logger.log(&format_args!(
-            "Detected {} of usable memory regions / frames at 4KiB in size.",
-            &usable_region_count
-        ), SerialLoggingLevel::Info);
 
         let mut simple_frame_allocator = unsafe {
             SimpleBootInfoFrameAllocator::new(&boot_info.memory_regions, 0)
