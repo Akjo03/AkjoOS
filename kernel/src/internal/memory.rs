@@ -12,6 +12,7 @@ use x86_64::{
     structures::paging::page::Size4KiB,
     VirtAddr
 };
+use crate::internal::serial::SerialLoggingLevel;
 
 pub struct SimpleHeapFrameAllocator {
     memory_regions: &'static MemoryRegions,
@@ -173,6 +174,10 @@ fn init_heap_range(
         unsafe {
             mapper.map_to(page, frame, flags, frame_allocator)?.flush()
         };
+    }
+
+    if let Some(serial_logger) = crate::get_serial_logger() {
+        serial_logger.log(&format_args!("Initialized heap range: {:#x?} - {:#x?}", start, start + size), SerialLoggingLevel::Debug);
     }
 
     Ok(())
