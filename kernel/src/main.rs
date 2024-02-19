@@ -18,7 +18,7 @@ use bootloader_api::info::FrameBufferInfo;
 use x86_64::VirtAddr;
 use crate::drivers::display::DisplayDriverType;
 use crate::internal::event::{Event, EventDispatcher, EventHandler};
-use crate::internal::memory::SimpleBootInfoFrameAllocator;
+use crate::internal::memory::SimpleHeapFrameAllocator;
 use crate::internal::serial::{SerialLoggingLevel, SerialPortLogger};
 use crate::kernel::Kernel;
 use crate::managers::display::{DisplayManager, DisplayMode, DisplayType};
@@ -83,7 +83,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         } else { panic!("Frame buffer not found!") }
 
         let mut simple_frame_allocator = unsafe {
-            SimpleBootInfoFrameAllocator::new(&boot_info.memory_regions, 0)
+            SimpleHeapFrameAllocator::new(&boot_info.memory_regions, 0)
         };
         let next = internal::memory::init_initial_heap(&mut mapper, &mut simple_frame_allocator)
             .expect("Failed to initialize initial heap!");
@@ -93,7 +93,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         ), SerialLoggingLevel::Info);
 
         let mut frame_allocator = unsafe {
-            internal::memory::BootInfoFrameAllocator::new(&boot_info.memory_regions, next)
+            internal::memory::HeapFrameAllocator::new(&boot_info.memory_regions, next)
         };
         let next = internal::memory::init_main_heap(&mut mapper, &mut frame_allocator)
             .expect("Failed to initialize main heap!");

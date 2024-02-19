@@ -13,10 +13,10 @@ use x86_64::{
     VirtAddr
 };
 
-pub struct SimpleBootInfoFrameAllocator {
+pub struct SimpleHeapFrameAllocator {
     memory_regions: &'static MemoryRegions,
     next: usize,
-} impl SimpleBootInfoFrameAllocator {
+} impl SimpleHeapFrameAllocator {
     pub unsafe fn new(memory_regions: &'static MemoryRegions, next: usize) -> Self { Self {
         memory_regions, next
     } }
@@ -24,7 +24,7 @@ pub struct SimpleBootInfoFrameAllocator {
     pub fn usable_regions(&self) -> impl Iterator<Item = PhysFrame> {
         get_usable_regions(self.memory_regions, self.next)
     }
-} unsafe impl FrameAllocator<Size4KiB> for SimpleBootInfoFrameAllocator {
+} unsafe impl FrameAllocator<Size4KiB> for SimpleHeapFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {
         let frame = self.usable_regions().next();
         self.next += 1;
@@ -32,15 +32,15 @@ pub struct SimpleBootInfoFrameAllocator {
     }
 }
 
-pub struct BootInfoFrameAllocator {
+pub struct HeapFrameAllocator {
     usable_frames: VecDeque<PhysFrame>,
     next: usize,
-} impl BootInfoFrameAllocator {
+} impl HeapFrameAllocator {
     pub unsafe fn new(memory_regions: &'static MemoryRegions, next: usize) -> Self {
         let usable_frames: VecDeque<_> = get_usable_regions(memory_regions, next).collect();
         Self { next, usable_frames }
     }
-} unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
+} unsafe impl FrameAllocator<Size4KiB> for HeapFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {
         self.next += 1;
         self.usable_frames.pop_front()
@@ -126,7 +126,7 @@ static ALLOCATOR: HeapManager = HeapManager::new();
 
 pub fn init_initial_heap(
     mapper: &mut impl Mapper<Size4KiB>,
-    frame_allocator: &mut SimpleBootInfoFrameAllocator,
+    frame_allocator: &mut SimpleHeapFrameAllocator,
 ) -> Result<usize, MapToError<Size4KiB>> {
     init_heap_range(mapper, frame_allocator, INITIAL_HEAP_START, INITIAL_HEAP_SIZE)?;
 
@@ -137,7 +137,7 @@ pub fn init_initial_heap(
 
 pub fn init_main_heap(
     mapper: &mut impl Mapper<Size4KiB>,
-    frame_allocator: &mut BootInfoFrameAllocator,
+    frame_allocator: &mut HeapFrameAllocator,
 ) -> Result<usize, MapToError<Size4KiB>> {
     init_heap_range(mapper, frame_allocator, MAIN_HEAP_START, MAIN_HEAP_SIZE)?;
 
