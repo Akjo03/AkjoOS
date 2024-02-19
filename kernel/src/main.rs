@@ -12,7 +12,6 @@ use alloc::string::String;
 use core::cell::RefCell;
 use core::panic::PanicInfo;
 use core::sync::atomic::Ordering;
-use acpi::madt::Madt;
 use bootloader_api::{BootInfo, BootloaderConfig};
 use bootloader_api::config::Mapping;
 use bootloader_api::info::FrameBufferInfo;
@@ -64,45 +63,6 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             &usable_region_count
         ), SerialLoggingLevel::Info);
 
-        // Load ACPI tables
-        let acpi_tables = internal::acpi::load(Option::from(boot_info.rsdp_addr), physical_memory_offset);
-        serial_logger.log(&format_args!(
-            "ACPI tables loaded."
-        ), SerialLoggingLevel::Info);
-
-        // Load MADT table
-        let madt = acpi_tables.find_table::<Madt>()
-            .expect("MADT table not found!");
-        let lapic_addr = madt.local_apic_address;
-        serial_logger.log(&format_args!(
-            "MADT table found with local APIC address {:#X}.",
-            lapic_addr
-        ), SerialLoggingLevel::Info);
-
-        // Load GDT table
-        internal::gdt::load();
-        serial_logger.log(&format_args!(
-            "Global descriptor table loaded."
-        ), SerialLoggingLevel::Info);
-
-        // Load IDT table
-        internal::idt::load();
-        serial_logger.log(&format_args!(
-            "Interrupt descriptor table loaded."
-        ), SerialLoggingLevel::Info);
-
-        // Setup Frame Buffer
-        if let Some(frame_buffer) = boot_info.framebuffer.as_mut() {
-            let info = frame_buffer.info().clone();
-            let buffer = frame_buffer.buffer_mut();
-            initialize_frame_buffer(buffer, info);
-
-            serial_logger.log(&format_args!(
-                "Frame buffer initialized with resolution {}x{} at {}bpp.",
-                info.width, info.height, info.bytes_per_pixel * 8
-            ), SerialLoggingLevel::Info);
-        } else { panic!("Frame buffer not found!") }
-
         // Initialize simple heap allocator
         let mut simple_heap_allocator = unsafe {
             SimpleHeapFrameAllocator::new(&boot_info.memory_regions, 0)
@@ -125,6 +85,50 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             "Main kernel heap initialized with {} bytes and global allocator switched to it. Stopped at frame {}/{}.",
             internal::memory::MAIN_HEAP_SIZE, next, &usable_region_count
         ), SerialLoggingLevel::Info);
+
+        // Load GDT table
+        internal::gdt::load();
+        serial_logger.log(&format_args!(
+            "Global descriptor table loaded."
+        ), SerialLoggingLevel::Info);
+
+        // Load ACPI tables
+        let acpi_tables = &internal::acpi::load(Option::from(boot_info.rsdp_addr), physical_memory_offset);
+        serial_logger.log(&format_args!(
+            "ACPI tables loaded."
+        ), SerialLoggingLevel::Info);
+
+        // Load MADT table
+        let madt_table = &internal::madt::load(acpi_tables, physical_memory_offset);
+        serial_logger.log(&format_args!(
+            "MADT table loaded."
+        ), SerialLoggingLevel::Info);
+
+        // Find APICs
+        let local_apic_addr = madt_table.local_apic_address();
+        let io_apics = madt_table.io_apics();
+        serial_logger.log(&format_args!(
+            "Found Local APIC address at {:?} and a total of {} IO APICs.",
+            local_apic_addr, io_apics.len()
+        ), SerialLoggingLevel::Info);
+
+        // Load IDT table
+        internal::idt::load(local_apic_addr, io_apics);
+        serial_logger.log(&format_args!(
+            "Interrupt descriptor table loaded."
+        ), SerialLoggingLevel::Info);
+
+        // Initialize Frame Buffer
+        if let Some(frame_buffer) = boot_info.framebuffer.as_mut() {
+            let info = frame_buffer.info().clone();
+            let buffer = frame_buffer.buffer_mut();
+            initialize_frame_buffer(buffer, info);
+
+            serial_logger.log(&format_args!(
+                "Frame buffer initialized with resolution {}x{} at {}bpp.",
+                info.width, info.height, info.bytes_per_pixel * 8
+            ), SerialLoggingLevel::Info);
+        } else { panic!("Frame buffer not found!") }
 
         // Initialize event dispatcher
         init_event_dispatcher();
