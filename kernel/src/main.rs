@@ -73,10 +73,10 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         // Load MADT table
         let madt = acpi_tables.find_table::<Madt>()
             .expect("MADT table not found!");
-        let apic_addr = madt.local_apic_address;
+        let lapic_addr = madt.local_apic_address;
         serial_logger.log(&format_args!(
             "MADT table found with local APIC address {:#X}.",
-            apic_addr
+            lapic_addr
         ), SerialLoggingLevel::Info);
 
         // Load GDT table
@@ -159,18 +159,13 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                     event_dispatcher.register(Rc::clone(&kernel) as Rc<RefCell<dyn EventHandler>>);
 
                     while kernel.borrow().running.load(Ordering::Relaxed) {
-                        x86_64::instructions::hlt();
+                        kernel.borrow_mut().tick.fetch_add(1, Ordering::Relaxed);
+                        kernel.borrow_mut().tick();
                     }
                 }
 
                 serial_logger.log(&format_args!(
                     "Kernel needs to stop running. Shutting down..."
-                ), SerialLoggingLevel::Info);
-
-                // Unload IDT table
-                internal::idt::unload();
-                serial_logger.log(&format_args!(
-                    "Interrupt descriptor table unloaded."
                 ), SerialLoggingLevel::Info);
 
                 // Halt kernel
@@ -236,12 +231,9 @@ fn abort(message: &str, display_manager: Option<&mut DisplayManager>) -> ! {
 impl EventHandler for Kernel<'_> {
     fn handle(&mut self, event: Event) {
         match event {
-            Event::TimerInterrupt => {
-                self.tick.fetch_add(1, Ordering::Relaxed);
-                self.tick();
-            }, Event::Error(event) => {
+            Event::Error(event) => {
                 self.on_error(event);
-            }, _ => {}
+            },
         }
     }
 }

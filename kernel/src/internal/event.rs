@@ -5,8 +5,6 @@ use core::cell::RefCell;
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    TimerInterrupt,
-    KeyboardInterrupt(u8),
     Error(ErrorEvent),
 }
 
