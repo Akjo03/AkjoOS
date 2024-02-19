@@ -99,17 +99,9 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         ), SerialLoggingLevel::Info);
 
         // Load MADT table
-        let madt_table = &internal::madt::load(acpi_tables, physical_memory_offset);
+        let _madt_table = &internal::madt::load(acpi_tables, physical_memory_offset);
         serial_logger.log(&format_args!(
             "MADT table loaded."
-        ), SerialLoggingLevel::Info);
-
-        // Find APICs
-        let local_apic_addr = madt_table.local_apic_address();
-        let io_apics = madt_table.io_apics();
-        serial_logger.log(&format_args!(
-            "Found Local APIC address at {:?} and a total of {} IO APICs.",
-            local_apic_addr, io_apics.len()
         ), SerialLoggingLevel::Info);
 
         // Load IDT table
