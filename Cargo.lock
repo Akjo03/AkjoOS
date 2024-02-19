@@ -3,6 +3,16 @@
 version = 3
 
 [[package]]
+name = "acpi"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e248409195304021f61b39ba2628f62a45a3abf6119669d44b3399d60eabe4c3"
+dependencies = [
+ "bit_field",
+ "log",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -589,6 +599,7 @@ checksum = "b1a46d1a171d865aa5f83f92695765caa047a9b4cbae2cbf37dbd613a793fd4c"
 name = "kernel"
 version = "0.1.0"
 dependencies = [
+ "acpi",
  "bootloader_api",
  "embedded-graphics",
  "lazy_static",
