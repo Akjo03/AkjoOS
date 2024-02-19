@@ -46,7 +46,7 @@ lazy_static! {
     };
 }
 
-pub fn init() {
+pub fn load() {
     use x86_64::instructions::tables::load_tss;
     use x86_64::instructions::segmentation::{CS, Segment};
 

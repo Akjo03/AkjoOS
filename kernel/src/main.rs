@@ -47,14 +47,14 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             "Serial port initialized. Booting kernel of AkjoOS..."
         ), SerialLoggingLevel::Info);
 
-        internal::gdt::init();
+        internal::gdt::load();
         serial_logger.log(&format_args!(
-            "Global descriptor table initialized."
+            "Global descriptor table loaded."
         ), SerialLoggingLevel::Info);
 
-        internal::idt::init();
+        internal::idt::load();
         serial_logger.log(&format_args!(
-            "Interrupt descriptor table initialized."
+            "Interrupt descriptor table loaded."
         ), SerialLoggingLevel::Info);
 
         if let Some(frame_buffer) = boot_info.framebuffer.as_mut() {
@@ -84,7 +84,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         ), SerialLoggingLevel::Info);
 
         let mut simple_frame_allocator = unsafe {
-            SimpleBootInfoFrameAllocator::new(&boot_info.memory_regions)
+            SimpleBootInfoFrameAllocator::new(&boot_info.memory_regions, 0)
         };
         let next = internal::memory::init_initial_heap(&mut mapper, &mut simple_frame_allocator)
             .expect("Failed to initialize initial heap!");
@@ -142,9 +142,9 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                     "Kernel needs to stop running. Shutting down..."
                 ), SerialLoggingLevel::Info);
 
-                internal::idt::disable();
+                internal::idt::unload();
                 serial_logger.log(&format_args!(
-                    "Interrupt descriptor table disabled."
+                    "Interrupt descriptor table unloaded."
                 ), SerialLoggingLevel::Info);
 
                 kernel.borrow_mut().halt();

@@ -51,13 +51,13 @@ lazy_static! {
     };
 }
 
-pub fn init() {
+pub fn load() {
     IDT.load();
     unsafe { PICS.lock().initialize(); }
     x86_64::instructions::interrupts::enable();
 }
 
-pub fn disable() {
+pub fn unload() {
     x86_64::instructions::interrupts::disable();
     unsafe { PICS.lock().disable() };
 }

@@ -17,8 +17,8 @@ pub struct SimpleBootInfoFrameAllocator {
     memory_regions: &'static MemoryRegions,
     next: usize,
 } impl SimpleBootInfoFrameAllocator {
-    pub unsafe fn new(memory_regions: &'static MemoryRegions) -> Self { Self {
-        memory_regions, next: 0,
+    pub unsafe fn new(memory_regions: &'static MemoryRegions, next: usize) -> Self { Self {
+        memory_regions, next
     } }
 
     pub fn usable_regions(&self) -> impl Iterator<Item = PhysFrame> {
