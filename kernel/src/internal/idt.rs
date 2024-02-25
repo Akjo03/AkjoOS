@@ -1,18 +1,22 @@
 use alloc::format;
-use lazy_static::lazy_static;
+use spin::Once;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 use crate::internal::event::{ErrorEvent, Event};
+use crate::internal::pic::PicInterrupts;
 
-lazy_static! {
-    static ref IDT: InterruptDescriptorTable = {
+static IDT: Once<InterruptDescriptorTable> = Once::new();
+
+pub fn load() {
+    IDT.call_once(|| {
         let mut idt = InterruptDescriptorTable::new();
 
-        // Exception Handlers
+        // Hardware Interrupt Handlers
+        idt[PicInterrupts::Timer.into_values().1 as usize].set_handler_fn(timer_interrupt_handler);
 
+        // Exception Handlers
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
         idt.invalid_tss.set_handler_fn(invalid_tss_handler);
-
         idt.page_fault.set_handler_fn(page_fault_handler);
         idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
 
@@ -22,71 +26,69 @@ lazy_static! {
         }
 
         idt
-    };
+    });
+
+    IDT.get().unwrap_or_else(|| panic!("Interrupt descriptor table not found!")).load();
+
+    x86_64::instructions::interrupts::enable();
 }
 
-pub fn load() {
-    IDT.load();
+pub fn without_interrupts<F, R>(func: F) -> R
+    where F: FnOnce() -> R {
+    x86_64::instructions::interrupts::without_interrupts(func)
+}
+
+pub fn disable_interrupts() {
+    x86_64::instructions::interrupts::disable();
+}
+
+// Hardware Interrupt Handlers
+
+extern "x86-interrupt" fn timer_interrupt_handler(
+    _stack_frame: InterruptStackFrame
+) {
+    crate::internal::event::EventDispatcher::global().push(Event::Timer);
+    crate::internal::pic::end_of_interrupt(PicInterrupts::Timer);
 }
 
 // Exception Handlers
 
 extern "x86-interrupt" fn breakpoint_handler(
     stack_frame: InterruptStackFrame
-) { if let Some(event_dispatcher) = crate::get_event_dispatcher() {
-    let event = Event::Error(ErrorEvent::Breakpoint(
-        format!("{:#?}", stack_frame)
-    ));
-
-    event_dispatcher.dispatch(event);
-} }
+) { crate::internal::event::EventDispatcher::global().push(Event::error(ErrorEvent::Breakpoint(
+    format!("{:#?}", stack_frame)
+))) }
 
 extern "x86-interrupt" fn invalid_opcode_handler(
     stack_frame: InterruptStackFrame
-) { if let Some(event_dispatcher) = crate::get_event_dispatcher() {
-    let event = Event::Error(ErrorEvent::InvalidOpcode(
-        format!("{:#?}", stack_frame)
-    ));
+) { crate::internal::event::EventDispatcher::global().push(Event::error(ErrorEvent::InvalidOpcode(
+    format!("{:#?}", stack_frame)
+))) }
 
-    event_dispatcher.dispatch(event);
-} }
 
 extern "x86-interrupt" fn invalid_tss_handler(
     stack_frame: InterruptStackFrame, error_code: u64
-) { if let Some(event_dispatcher) = crate::get_event_dispatcher() {
-    let event = Event::Error(ErrorEvent::InvalidTss(
-        format!("{:#?}, error code: {:#?}", stack_frame, error_code)
-    ));
-
-    event_dispatcher.dispatch(event);
-} }
+) { crate::internal::event::EventDispatcher::global().push(Event::error(ErrorEvent::InvalidTss(
+    format!("{:#?}", stack_frame), error_code
+))) }
 
 extern "x86-interrupt" fn page_fault_handler(
     stack_frame: InterruptStackFrame, error_code: PageFaultErrorCode
-) { if let Some(event_dispatcher) = crate::get_event_dispatcher() {
-    let event = Event::Error(ErrorEvent::PageFault(
-        format!("{:#?}, error code: {:#?}", stack_frame, error_code)
-    ));
-
-    event_dispatcher.dispatch(event);
-} }
+) { crate::internal::event::EventDispatcher::global().push(Event::error(ErrorEvent::PageFault(
+    format!("{:#?}", stack_frame), error_code.bits()
+))) }
 
 extern "x86-interrupt" fn general_protection_fault_handler(
-    stack_frame: InterruptStackFrame, _error_code: u64
-) { if let Some(event_dispatcher) = crate::get_event_dispatcher() {
-    let event = Event::Error(ErrorEvent::GeneralProtectionFault(
-        format!("{:#?}", stack_frame)
-    ));
-
-    event_dispatcher.dispatch(event);
-} }
+    stack_frame: InterruptStackFrame, error_code: u64
+) { crate::internal::event::EventDispatcher::global().push(Event::error(ErrorEvent::GeneralProtectionFault(
+    format!("{:#?}", stack_frame), error_code
+))) }
 
 extern "x86-interrupt" fn double_fault_handler(
-    stack_frame: InterruptStackFrame, _error_code: u64
-) -> ! { if let Some(event_dispatcher) = crate::get_event_dispatcher() {
-    let event = Event::Error(ErrorEvent::DoubleFault(
-        format!("{:#?}", stack_frame)
-    ));
-
-    event_dispatcher.dispatch(event);
-} loop { x86_64::instructions::hlt(); } }
+    stack_frame: InterruptStackFrame, error_code: u64
+) -> ! {
+    crate::internal::event::EventDispatcher::global().push(Event::error(ErrorEvent::DoubleFault(
+        format!("{:#?}", stack_frame), error_code
+    )));
+    loop { x86_64::instructions::hlt(); }
+}

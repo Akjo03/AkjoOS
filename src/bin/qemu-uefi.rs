@@ -11,6 +11,8 @@ fn main() {
                 env::var("CARGO_MANIFEST_DIR").unwrap())
     );
 
+    qemu.arg("-machine").arg("q35");
+
     qemu.arg("-drive");
     qemu.arg(format!("format=raw,file={}", env!("UEFI_IMAGE")));
     qemu.arg("-bios").arg(ovmf_prebuilt::ovmf_pure_efi());
@@ -37,6 +39,8 @@ fn main() {
     println!("VGA options: {}", env!("VGA_OPTIONS"));
     qemu.arg("-m").arg(env!("AVAILABLE_MEMORY"));
     println!("Available memory: {}", env!("AVAILABLE_MEMORY"));
+    qemu.arg("-smp").arg(env!("CPU_COUNT"));
+    println!("Available CPUs: {}", env!("CPU_COUNT"));
 
     qemu.arg("-S");
 

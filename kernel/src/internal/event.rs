@@ -1,52 +1,31 @@
-use alloc::rc::Rc;
+use alloc::collections::VecDeque;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::cell::RefCell;
+use core::sync::atomic::{AtomicBool, Ordering};
+use spin::mutex::Mutex;
+use spin::Once;
+
+static EVENT_DISPATCHER: Once<EventDispatcher> = Once::new();
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    Error(ErrorEvent),
+    Timer,
+    Error(ErrorEvent)
+} impl Event {
+    pub fn error(event: ErrorEvent) -> Self {
+        Event::Error(event)
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum ErrorEvent {
-    PageFault(String),
-    GeneralProtectionFault(String),
-    InvalidOpcode(String),
-    InvalidTss(String),
-    DoubleFault(String),
     Breakpoint(String),
-} #[allow(dead_code)] impl ErrorEvent {
-    pub fn message(&self) -> &String {
-        match self {
-            Self::PageFault(message) => message,
-            Self::GeneralProtectionFault(message) => message,
-            Self::InvalidOpcode(message) => message,
-            Self::InvalidTss(message) => message,
-            Self::DoubleFault(message) => message,
-            Self::Breakpoint(message) => message,
-        }
-    }
-
-    pub fn level(&self) -> ErrorLevel {
-        match self {
-            Self::PageFault(_) => ErrorLevel::Fault,
-            Self::GeneralProtectionFault(_) => ErrorLevel::Fault,
-            Self::InvalidOpcode(_) => ErrorLevel::Fault,
-            Self::InvalidTss(_) => ErrorLevel::Fault,
-            Self::DoubleFault(_) => ErrorLevel::Abort,
-            Self::Breakpoint(_) => ErrorLevel::Trap,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub enum ErrorLevel {
-    Interrupt,
-    Trap,
-    Fault,
-    Abort,
+    InvalidOpcode(String),
+    InvalidTss(String, u64),
+    PageFault(String, u64),
+    GeneralProtectionFault(String, u64),
+    DoubleFault(String, u64)
 }
 
 pub trait EventHandler {
@@ -54,18 +33,45 @@ pub trait EventHandler {
 }
 
 pub struct EventDispatcher {
-    handlers: Vec<Rc<RefCell<dyn EventHandler>>>,
-} impl EventDispatcher {
-    pub fn new() -> EventDispatcher { Self {
-        handlers: Vec::new()
-    } }
-
-    pub fn register(&mut self, handler: Rc<RefCell<dyn EventHandler>>) {
-        self.handlers.push(handler);
+    handlers: Mutex<Vec<Arc<Mutex<dyn EventHandler + Send>>>>,
+    queue: Mutex<VecDeque<Event>>,
+    new_event: AtomicBool
+} #[allow(dead_code)] impl EventDispatcher {
+    pub fn global() -> &'static Self {
+        EVENT_DISPATCHER.call_once(|| EventDispatcher::new())
     }
 
-    pub fn dispatch(&self, event: Event) {
-        self.handlers.iter()
-            .for_each(|handler| handler.borrow_mut().handle(event.clone()));
+    pub fn new() -> Self { Self {
+        handlers: Mutex::new(Vec::new()),
+        queue: Mutex::new(VecDeque::new()),
+        new_event: AtomicBool::new(false)
+    } }
+
+    pub fn register(&self, handler: Arc<Mutex<dyn EventHandler + Send>>) {
+        self.handlers.lock().push(handler);
+    }
+
+    pub fn push(&self, event: Event) {
+        self.queue.lock().push_back(event);
+        self.new_event.store(true, Ordering::Relaxed)
+    }
+
+    pub fn dispatch(&self) {
+        crate::internal::idt::without_interrupts(|| {
+            let mut local_queue = VecDeque::new();
+
+            core::mem::swap(&mut *self.queue.lock(), &mut local_queue);
+
+            while let Some(event) = local_queue.pop_front() {
+                let mut handlers = self.handlers.try_lock();
+                if let Some(handlers) = handlers.as_mut() {
+                    for handler in handlers.iter_mut() {
+                        handler.lock().handle(event.clone());
+                    }
+                } else { log::warn!("Event handlers are locked, skipping dispatch."); return; }
+            }
+
+            self.new_event.store(false, Ordering::Relaxed);
+        })
     }
 }
