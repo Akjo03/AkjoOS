@@ -17,12 +17,14 @@ pub fn load() {
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
         idt.invalid_tss.set_handler_fn(invalid_tss_handler);
-        idt.page_fault.set_handler_fn(page_fault_handler);
-        idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
 
         unsafe {
             idt.double_fault.set_handler_fn(double_fault_handler)
                 .set_stack_index(super::gdt::DOUBLE_FAULT_IST_INDEX);
+            idt.page_fault.set_handler_fn(page_fault_handler)
+                .set_stack_index(super::gdt::PAGE_FAULT_IST_INDEX);
+            idt.general_protection_fault.set_handler_fn(general_protection_fault_handler)
+                .set_stack_index(super::gdt::GENERAL_PROTECTION_FAULT_IST_INDEX);
         }
 
         idt

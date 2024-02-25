@@ -9,13 +9,18 @@
 extern crate alloc;
 
 use alloc::string::String;
+use alloc::sync::Arc;
 use core::panic::PanicInfo;
+use core::sync::atomic::Ordering;
 use bootloader_api::{BootInfo, BootloaderConfig};
 use bootloader_api::config::Mapping;
+use spin::Mutex;
 use x86_64::VirtAddr;
+use crate::internal::event::{Event, EventHandler};
 use crate::internal::pic::{PicInterrupts, PicMask};
 
 mod internal;
+mod kernel;
 
 const BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -99,12 +104,27 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     internal::idt::load();
     log::info!("Interrupt descriptor table loaded and interrupts enabled.");
 
-    // TODO: Do kernel stuff here
-    log::info!("Kernel booted successfully.");
+    let kernel = Arc::new(Mutex::new(kernel::Kernel::new()));
+
+    // Initialize kernel
+    kernel.lock().init();
+    internal::event::EventDispatcher::global().register(kernel.clone());
+    log::info!("Kernel initialized and registered as event handler.");
+
+    // Main kernel loop
+    while kernel.lock().running.load(Ordering::SeqCst) {
+        internal::event::EventDispatcher::global().dispatch();
+    }
+
+    log::info!("Kernel needs to stop running. Shutting down...");
 
     // Disable interrupts
     internal::idt::disable_interrupts();
     log::info!("Interrupts disabled.");
+
+    // Halt kernel
+    kernel.lock().halt();
+    log::info!("Kernel halted.");
 
     // Initiate shutdown
     acpi.shutdown().unwrap_or_else(|err| panic!("Failed to initiate shutdown: {:#?}", err));
@@ -112,6 +132,18 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     // Halt CPU
     loop { x86_64::instructions::hlt(); }
+}
+
+impl EventHandler for kernel::Kernel {
+    fn handle(&mut self, event: Event) {
+        match event {
+            Event::Timer => {
+                self.tick.fetch_add(1, Ordering::SeqCst);
+                self.tick();
+            },
+            Event::Error(event) => self.on_error(event),
+        }
+    }
 }
 
 #[panic_handler]

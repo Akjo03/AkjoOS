@@ -6,7 +6,11 @@ use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable};
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::VirtAddr;
 
-pub const DOUBLE_FAULT_IST_INDEX: u16 = 1;
+const STACK_SIZE: usize = 4096 * 5;
+
+pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
+pub const PAGE_FAULT_IST_INDEX: u16 = 1;
+pub const GENERAL_PROTECTION_FAULT_IST_INDEX: u16 = 2;
 
 struct Selectors {
     code_selector: SegmentSelector,
@@ -26,12 +30,16 @@ lazy_static! {
     static ref TSS: TaskStateSegment = {
         let mut tss = TaskStateSegment::new();
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize] = {
-            const STACK_SIZE: usize = 4096 * 5;
             static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
-
-            let stack_start = VirtAddr::from_ptr(unsafe { addr_of!(STACK) });
-            let stack_end = stack_start + STACK_SIZE;
-            stack_end
+            VirtAddr::from_ptr(unsafe { addr_of!(STACK) }) + STACK_SIZE
+        };
+        tss.interrupt_stack_table[PAGE_FAULT_IST_INDEX as usize] = {
+            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+            VirtAddr::from_ptr(unsafe { addr_of!(STACK) }) + STACK_SIZE
+        };
+        tss.interrupt_stack_table[GENERAL_PROTECTION_FAULT_IST_INDEX as usize] = {
+            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+            VirtAddr::from_ptr(unsafe { addr_of!(STACK) }) + STACK_SIZE
         };
         tss
     };

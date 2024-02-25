@@ -2,6 +2,8 @@ use pic8259::ChainedPics;
 use spin::{Mutex, Once};
 use x86_64::instructions::port::Port;
 
+static DATA_PORT: u16 = 0x40;
+static COMMAND_PORT: u16 = 0x43;
 static OPERATING_MODE: u8 = 0b0011_0100; // 16-bit binary, rate generator, lo/hi byte, channel 0
 pub static TIMER_HZ: u64 = 1000; // 1000Hz (min 19Hz, max 1193180Hz) - 1ms interval
 pub static TIMER_DIVISOR: u64 = 1193180 / TIMER_HZ;
@@ -70,8 +72,8 @@ pub fn init(mask: PicMask) {
     unsafe {
         let mut pics = PICS.get().unwrap_or_else(|| panic!("PIC not loaded!")).lock();
 
-        let mut command_port: Port<u8> = Port::new(0x43);
-        let mut data_port: Port<u8> = Port::new(0x40);
+        let mut data_port: Port<u8> = Port::new(DATA_PORT);
+        let mut command_port: Port<u8> = Port::new(COMMAND_PORT);
 
         let low_byte = (TIMER_DIVISOR & 0xFF) as u8;
         let high_byte = ((TIMER_DIVISOR >> 8) & 0xFF) as u8;
