@@ -1,5 +1,10 @@
 use pic8259::ChainedPics;
 use spin::{Mutex, Once};
+use x86_64::instructions::port::Port;
+
+static OPERATING_MODE: u8 = 0b0011_0100; // 16-bit binary, rate generator, lo/hi byte, channel 0
+pub static TIMER_HZ: u64 = 1000; // 1000Hz (min 19Hz, max 1193180Hz) - 1ms interval
+pub static TIMER_DIVISOR: u64 = 1193180 / TIMER_HZ;
 
 static PIC1_OFFSET: u8 = 0x20;
 static PIC2_OFFSET: u8 = 0x28;
@@ -62,7 +67,21 @@ pub fn init(mask: PicMask) {
         Mutex::new(ChainedPics::new(PIC1_OFFSET, PIC2_OFFSET))
     });
     mask.apply();
-    unsafe { PICS.get().unwrap_or_else(|| panic!("PIC not loaded!")).lock().initialize() }
+    unsafe {
+        let mut pics = PICS.get().unwrap_or_else(|| panic!("PIC not loaded!")).lock();
+
+        let mut command_port: Port<u8> = Port::new(0x43);
+        let mut data_port: Port<u8> = Port::new(0x40);
+
+        let low_byte = (TIMER_DIVISOR & 0xFF) as u8;
+        let high_byte = ((TIMER_DIVISOR >> 8) & 0xFF) as u8;
+
+        command_port.write(OPERATING_MODE);
+        data_port.write(low_byte);
+        data_port.write(high_byte);
+
+        pics.initialize();
+    }
 }
 
 pub fn end_of_interrupt(interrupt: PicInterrupts) {
