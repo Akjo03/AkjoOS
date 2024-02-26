@@ -66,7 +66,10 @@ pub struct EventDispatcher {
                 let mut handlers = self.handlers.try_lock();
                 if let Some(handlers) = handlers.as_mut() {
                     for handler in handlers.iter_mut() {
-                        handler.lock().handle(event.clone());
+                        let mut handler = handler.try_lock();
+                        if let Some(handler) = handler.as_mut() {
+                            handler.handle(event.clone());
+                        } else { log::warn!("Event handler is locked, skipping dispatch."); }
                     }
                 } else { log::warn!("Event handlers are locked, skipping dispatch."); return; }
             }

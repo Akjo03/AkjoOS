@@ -576,6 +576,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "aml",
+ "bit_field",
  "bootloader_api",
  "lazy_static",
  "linked_list_allocator",
