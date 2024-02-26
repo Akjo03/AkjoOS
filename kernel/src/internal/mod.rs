@@ -8,3 +8,4 @@ pub mod event;
 pub mod idt;
 pub mod pic;
 pub mod cmos;
+pub mod framebuffer;
