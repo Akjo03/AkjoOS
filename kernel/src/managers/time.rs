@@ -12,7 +12,10 @@ pub struct TimeManager {
         Self { clock }
     }
 
-    pub fn get_clock(&self) -> Arc<Mutex<dyn TimeApi + Send>> {
-        self.clock.clone()
+    pub fn with_clock<F, T>(&self, f: F) -> T
+        where F: FnOnce(&mut dyn TimeApi) -> T
+    {
+        let mut clock = self.clock.lock();
+        f(&mut *clock)
     }
 }
