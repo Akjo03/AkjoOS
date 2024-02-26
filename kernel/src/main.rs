@@ -123,17 +123,6 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     internal::idt::load();
     log::info!("Interrupt descriptor table loaded and interrupts enabled.");
 
-    // Initialize frame buffer
-    if let Some(frame_buffer) = boot_info.framebuffer.as_mut() {
-        let info = frame_buffer.info().clone();
-        let buffer = frame_buffer.buffer_mut();
-        internal::framebuffer::init(buffer, info);
-        log::info!(
-            "Frame buffer initialized with resolution {}x{} and {}bpp.",
-            info.width, info.height, info.bytes_per_pixel * 8
-        )
-    }
-
     // Initialize new time manager
     let time_manager = TimeManager::new();
     log::info!("Time manager initialized.");
