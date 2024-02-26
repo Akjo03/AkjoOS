@@ -498,5 +498,6 @@ pub struct DateTime {
 }
 
 pub trait TimeApi {
+    /// Get the current date and time.
     fn now(&self) -> &DateTime;
 }

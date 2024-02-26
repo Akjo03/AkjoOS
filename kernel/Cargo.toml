@@ -13,6 +13,7 @@ acpi = "5.0.0"
 aml = "0.16.4"
 bit_field = "0.10.2"
 bootloader_api = "0.11.7"
+embedded-graphics = "0.8.1"
 pic8259 = "0.10.4"
 spin = "0.9.8"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
