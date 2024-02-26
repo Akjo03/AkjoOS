@@ -11,16 +11,21 @@ extern crate alloc;
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::panic::PanicInfo;
-use core::sync::atomic::Ordering;
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use bootloader_api::{BootInfo, BootloaderConfig};
 use bootloader_api::config::Mapping;
 use spin::Mutex;
 use x86_64::VirtAddr;
-use crate::internal::event::{Event, EventHandler};
+use crate::internal::event::{ErrorEvent, Event, EventHandler};
 use crate::internal::pic::{PicInterrupts, PicMask};
+use crate::managers::time::TimeManager;
 
 mod internal;
 mod kernel;
+
+mod api;
+mod systems;
+mod managers;
 
 const BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -109,14 +114,22 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     // Initialize CMOS and enable interrupts
     internal::cmos::init(fadt.century);
-    internal::cmos::Cmos::global().lock().enable_interrupts();
+    internal::cmos::Cmos::global()
+        .unwrap_or_else(|| panic!("CMOS not found!"))
+        .lock().enable_interrupts();
     log::info!("CMOS initialized and CMOS interrupts enabled.");
 
     // Load IDT table
     internal::idt::load();
     log::info!("Interrupt descriptor table loaded and interrupts enabled.");
 
-    let kernel = Arc::new(Mutex::new(kernel::Kernel::new()));
+    // Initialize new time manager
+    let time_manager = managers::time::TimeManager::new();
+    log::info!("Time manager initialized.");
+
+    let kernel = Arc::new(Mutex::new(Kernel::new(
+        time_manager
+    )));
 
     // Initialize kernel
     kernel.lock().init();
@@ -147,7 +160,20 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     loop { x86_64::instructions::hlt(); }
 }
 
-impl EventHandler for kernel::Kernel {
+#[allow(dead_code)]
+pub struct Kernel {
+    time_manager: TimeManager,
+    pub tick: AtomicU64,
+    pub running: AtomicBool
+} impl Kernel {
+    pub fn new(
+        time_manager: TimeManager
+    ) -> Self { Self {
+        time_manager,
+        tick: AtomicU64::new(0),
+        running: AtomicBool::new(true)
+    } }
+} impl EventHandler for Kernel {
     fn handle(&mut self, event: Event) {
         match event {
             Event::Timer => {
@@ -158,6 +184,13 @@ impl EventHandler for kernel::Kernel {
             _ => {}
         }
     }
+}
+
+pub trait KernelRuntime {
+    fn init(&mut self);
+    fn tick(&mut self);
+    fn on_error(&mut self, event: ErrorEvent);
+    fn halt(&mut self);
 }
 
 #[panic_handler]

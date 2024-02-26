@@ -1,4 +1,3 @@
-use core::fmt::Display;
 use core::hint::spin_loop;
 use bit_field::BitField;
 use spin::{Mutex, Once};
@@ -26,17 +25,13 @@ enum CmosRegister {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct DateTime {
+pub struct Rtc {
     pub seconds: u8,
     pub minutes: u8,
     pub hours: u8,
     pub day: u8,
     pub month: u8,
     pub year: u16
-} impl Display for DateTime {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:02}/{:02}/{:04} {:02}:{:02}:{:02}", self.month, self.day, self.year, self.hours, self.minutes, self.seconds)
-    }
 }
 
 pub struct Cmos {
@@ -44,8 +39,8 @@ pub struct Cmos {
     port_2: Port<u8>,
     century_register: u8
 } impl Cmos {
-    pub(crate) fn global() -> &'static Mutex<Self> {
-        CMOS.get().expect("CMOS not initialized!")
+    pub(crate) fn global() -> Option<&'static Mutex<Self>> {
+        CMOS.get()
     }
 
     fn new(century_register: u8) -> Self { Self {
@@ -54,7 +49,7 @@ pub struct Cmos {
         century_register
     } }
 
-    fn read_date_time(&mut self) -> DateTime {
+    fn read_date_time(&mut self) -> Rtc {
         while self.read_register(CmosRegister::StatusC as u8) & 0x80 != 0 {}
         let seconds = self.read_register(CmosRegister::Seconds as u8);
         let minutes = self.read_register(CmosRegister::Minutes as u8);
@@ -62,11 +57,10 @@ pub struct Cmos {
         let day = self.read_register(CmosRegister::Day as u8);
         let month = self.read_register(CmosRegister::Month as u8);
         let year = self.read_register(CmosRegister::Year as u8) as u16;
-        DateTime { seconds, minutes, hours, day, month, year }
+        Rtc { seconds, minutes, hours, day, month, year }
     }
 
-    pub fn rtc(&mut self) -> DateTime {
-        self.disable_nmi();
+    pub fn rtc(&mut self) -> Rtc {
         let mut rtc;
         loop {
             self.wait_for_update();
@@ -97,7 +91,6 @@ pub struct Cmos {
             _ => CENTURY
         };
 
-        self.enable_nmi();
         rtc
     }
 
@@ -106,7 +99,7 @@ pub struct Cmos {
             self.disable_nmi();
             let prev = self.read_register(CmosRegister::StatusB as u8);
             self.write_register(CmosRegister::StatusB, 0x8B);
-            self.write_register(CmosRegister::StatusB, prev | 0x40);
+            self.write_register(CmosRegister::StatusB, prev | 1 << 6);
             self.enable_nmi();
             self.notify_end_of_interrupt();
         })

@@ -57,7 +57,9 @@ extern "x86-interrupt" fn timer_interrupt_handler(
 extern "x86-interrupt" fn rtc_interrupt_handler(
     _stack_frame: InterruptStackFrame
 ) {
-    let date_time = crate::internal::cmos::Cmos::global().lock().rtc();
+    let date_time = crate::internal::cmos::Cmos::global()
+        .unwrap_or_else(|| panic!("CMOS not found!"))
+        .lock().rtc();
     crate::internal::event::EventDispatcher::global().push(Event::Rtc(date_time));
     crate::internal::pic::end_of_interrupt(PicInterrupts::RTC);
 }

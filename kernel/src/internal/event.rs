@@ -5,14 +5,14 @@ use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, Ordering};
 use spin::mutex::Mutex;
 use spin::Once;
-use crate::internal::cmos::DateTime;
+use crate::internal::cmos::Rtc;
 
 static EVENT_DISPATCHER: Once<EventDispatcher> = Once::new();
 
 #[derive(Debug, Clone)]
 pub enum Event {
     Timer,
-    Rtc(DateTime),
+    Rtc(Rtc),
     Error(ErrorEvent)
 } impl Event {
     pub fn error(event: ErrorEvent) -> Self {
