@@ -12,10 +12,11 @@ pub struct TimeManager {
         Self { clock }
     }
 
-    pub fn with_clock<F, T>(&self, f: F) -> T
+    pub fn with_clock<F, T>(&self, func: F) -> Option<T>
         where F: FnOnce(&mut dyn TimeApi) -> T
     {
-        let mut clock = self.clock.lock();
-        f(&mut *clock)
+        if let Some(mut clock) = self.clock.try_lock() {
+            Some(func(&mut *clock))
+        } else { None }
     }
 }
