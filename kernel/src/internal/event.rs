@@ -5,12 +5,14 @@ use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, Ordering};
 use spin::mutex::Mutex;
 use spin::Once;
+use crate::internal::cmos::DateTime;
 
 static EVENT_DISPATCHER: Once<EventDispatcher> = Once::new();
 
 #[derive(Debug, Clone)]
 pub enum Event {
     Timer,
+    Rtc(DateTime),
     Error(ErrorEvent)
 } impl Event {
     pub fn error(event: ErrorEvent) -> Self {
@@ -41,7 +43,7 @@ pub struct EventDispatcher {
         EVENT_DISPATCHER.call_once(|| EventDispatcher::new())
     }
 
-    pub fn new() -> Self { Self {
+    fn new() -> Self { Self {
         handlers: Mutex::new(Vec::new()),
         queue: Mutex::new(VecDeque::new()),
         new_event: AtomicBool::new(false)

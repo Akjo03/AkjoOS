@@ -12,6 +12,7 @@ pub fn load() {
 
         // Hardware Interrupt Handlers
         idt[PicInterrupts::Timer.into_values().1 as usize].set_handler_fn(timer_interrupt_handler);
+        idt[PicInterrupts::RTC.into_values().1 as usize].set_handler_fn(rtc_interrupt_handler);
 
         // Exception Handlers
         idt.breakpoint.set_handler_fn(breakpoint_handler);
@@ -51,6 +52,14 @@ extern "x86-interrupt" fn timer_interrupt_handler(
 ) {
     crate::internal::event::EventDispatcher::global().push(Event::Timer);
     crate::internal::pic::end_of_interrupt(PicInterrupts::Timer);
+}
+
+extern "x86-interrupt" fn rtc_interrupt_handler(
+    _stack_frame: InterruptStackFrame
+) {
+    let date_time = crate::internal::cmos::Cmos::global().lock().rtc();
+    crate::internal::event::EventDispatcher::global().push(Event::Rtc(date_time));
+    crate::internal::pic::end_of_interrupt(PicInterrupts::RTC);
 }
 
 // Exception Handlers

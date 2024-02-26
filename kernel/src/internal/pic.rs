@@ -1,6 +1,7 @@
 use pic8259::ChainedPics;
 use spin::{Mutex, Once};
 use x86_64::instructions::port::Port;
+use bit_field::BitField;
 
 static DATA_PORT: u16 = 0x40;
 static COMMAND_PORT: u16 = 0x43;
@@ -15,27 +16,28 @@ static PICS: Once<Mutex<ChainedPics>> = Once::new();
 
 #[allow(dead_code)]
 pub enum PicInterrupts {
-    Timer, Keyboard,
+    Timer, Keyboard, PassThrough,
     RTC, ACPI, PCI1, PCI2, Mouse, FPU, PrimaryATA, SecondaryATA,
     COM2, COM1, LPT2, Floppy, LPT1
 } impl PicInterrupts {
     pub fn into_values(self) -> (u8, u8) {
         match self {
-            PicInterrupts::Timer => (0b0000_0001, PIC1_OFFSET),
-            PicInterrupts::Keyboard => (0b0000_0010, PIC1_OFFSET + 1),
-            PicInterrupts::RTC => (0b0000_0001, PIC2_OFFSET),
-            PicInterrupts::ACPI => (0b0000_0010, PIC2_OFFSET + 1),
-            PicInterrupts::PCI1 => (0b0000_0100, PIC2_OFFSET + 2),
-            PicInterrupts::PCI2 => (0b0000_1000, PIC2_OFFSET + 3),
-            PicInterrupts::Mouse => (0b0001_0000, PIC2_OFFSET + 4),
-            PicInterrupts::FPU => (0b0010_0000, PIC2_OFFSET + 5),
-            PicInterrupts::PrimaryATA => (0b0100_0000, PIC2_OFFSET + 6),
-            PicInterrupts::SecondaryATA => (0b1000_0000, PIC2_OFFSET + 7),
-            PicInterrupts::COM2 => (0b0000_1000, PIC1_OFFSET + 3),
-            PicInterrupts::COM1 => (0b0000_0100, PIC1_OFFSET + 4),
-            PicInterrupts::LPT2 => (0b0000_1000, PIC1_OFFSET + 5),
-            PicInterrupts::Floppy => (0b0000_0100, PIC1_OFFSET + 6),
-            PicInterrupts::LPT1 => (0b0000_0010, PIC1_OFFSET + 7)
+            PicInterrupts::Timer => (0, PIC1_OFFSET),
+            PicInterrupts::Keyboard => (1, PIC1_OFFSET + 1),
+            PicInterrupts::PassThrough => (2, PIC1_OFFSET + 2),
+            PicInterrupts::RTC => (0, PIC2_OFFSET),
+            PicInterrupts::ACPI => (1, PIC2_OFFSET + 1),
+            PicInterrupts::PCI1 => (2, PIC2_OFFSET + 2),
+            PicInterrupts::PCI2 => (3, PIC2_OFFSET + 3),
+            PicInterrupts::Mouse => (4, PIC2_OFFSET + 4),
+            PicInterrupts::FPU => (5, PIC2_OFFSET + 5),
+            PicInterrupts::PrimaryATA => (6, PIC2_OFFSET + 6),
+            PicInterrupts::SecondaryATA => (7, PIC2_OFFSET + 7),
+            PicInterrupts::COM2 => (3, PIC1_OFFSET + 3),
+            PicInterrupts::COM1 => (4, PIC1_OFFSET + 4),
+            PicInterrupts::LPT2 => (5, PIC1_OFFSET + 5),
+            PicInterrupts::Floppy => (6, PIC1_OFFSET + 6),
+            PicInterrupts::LPT1 => (7, PIC1_OFFSET + 7)
         }
     }
 }
@@ -51,9 +53,9 @@ pub struct PicMask {
     pub fn enable(&mut self, interrupt: PicInterrupts) {
         let (mask, offset) = interrupt.into_values();
         if offset < PIC2_OFFSET {
-            self.pic1 &= !mask;
+            self.pic1.set_bit(mask as usize, false);
         } else {
-            self.pic2 &= !mask;
+            self.pic2.set_bit(mask as usize, false);
         }
     }
 

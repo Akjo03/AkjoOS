@@ -7,3 +7,4 @@ pub mod aml;
 pub mod event;
 pub mod idt;
 pub mod pic;
+pub mod cmos;

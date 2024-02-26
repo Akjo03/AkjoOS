@@ -94,11 +94,23 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         platform_info.platform_type(), processor_info.application_processors.iter().count() + 1
     );
 
+    // Load FADT table
+    let fadt = acpi.fadt()
+        .unwrap_or_else(|err| panic!("FADT table not found: {:#?}", err));
+    log::info!("FADT table loaded.");
+
     // Initialize PIC8259
     let mut pic_mask = PicMask::new();
     pic_mask.enable(PicInterrupts::Timer);
+    pic_mask.enable(PicInterrupts::PassThrough);
+    pic_mask.enable(PicInterrupts::RTC);
     internal::pic::init(pic_mask);
     log::info!("Programmable interrupt controller initialized.");
+
+    // Initialize CMOS and enable interrupts
+    internal::cmos::init(fadt.century);
+    internal::cmos::Cmos::global().lock().enable_interrupts();
+    log::info!("CMOS initialized and CMOS interrupts enabled.");
 
     // Load IDT table
     internal::idt::load();
@@ -112,6 +124,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     log::info!("Kernel initialized and registered as event handler.");
 
     // Main kernel loop
+    log::info!("Kernel booted successfully. Entering main loop...");
     while kernel.lock().running.load(Ordering::SeqCst) {
         internal::event::EventDispatcher::global().dispatch();
     }
@@ -142,6 +155,7 @@ impl EventHandler for kernel::Kernel {
                 self.tick();
             },
             Event::Error(event) => self.on_error(event),
+            _ => {}
         }
     }
 }

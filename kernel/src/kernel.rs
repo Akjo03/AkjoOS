@@ -15,13 +15,10 @@ pub struct Kernel {
     }
 
     pub fn tick(&mut self) {
-        let secs = self.tick.load(Ordering::SeqCst) / 1000;
-
-        if self.tick.load(Ordering::SeqCst) % 1000 == 0 {
-            log::info!("About {}s have passed.", secs);
+        log::info!("Kernel.tick({})", self.tick.load(Ordering::SeqCst));
+        if self.tick.load(Ordering::SeqCst) == 1 {
+            self.running.store(false, Ordering::SeqCst); // Stop the kernel after the first tick
         }
-
-        if secs >= 10 { self.running.store(false, Ordering::SeqCst); }
     }
 
     pub fn on_error(&mut self, event: ErrorEvent) {
