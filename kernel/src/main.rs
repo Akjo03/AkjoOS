@@ -148,12 +148,11 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     display_manager.clear_screen();
     log::info!("Display manager initialized.");
 
+    // Initialize kernel
     let kernel = Arc::new(Mutex::new(Kernel::new(
         time_manager,
         display_manager
     )));
-
-    // Initialize kernel
     kernel.lock().init();
     api::event::EventDispatcher::global().register(kernel.clone());
     log::info!("Kernel initialized and registered as event handler.");
