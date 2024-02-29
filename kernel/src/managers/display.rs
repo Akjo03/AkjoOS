@@ -1,20 +1,29 @@
 use alloc::sync::Arc;
 use spin::Mutex;
-use crate::api::display::{Colors, DisplayApi};
+use spin::rwlock::RwLock;
+use crate::api::display::{Colors, DisplayApi, Fonts};
 use crate::drivers::display::{CommonDisplayDriver, DisplayDriverManager, DisplayDriverType, DummyDisplayDriver};
+use crate::drivers::display::text::{TextDisplayDriver, TextDisplayDriverArgs};
 use crate::systems::display::{BufferedDisplay, SimpleDisplay};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum DisplayMode {
     Unknown,
-    Dummy
+    Dummy,
+    Text(Fonts)
 } impl DisplayMode {
     fn get_driver(self) -> DisplayDriverType {
         match self {
+            DisplayMode::Unknown => DisplayDriverType::Unknown,
             DisplayMode::Dummy => DisplayDriverType::Dummy(
                 DummyDisplayDriver::new()
-            ), _ => DisplayDriverType::Unknown
+            ), DisplayMode::Text(font) => DisplayDriverType::Text(
+                TextDisplayDriver::new(),
+                TextDisplayDriverArgs::new(
+                    Arc::new(RwLock::new(font))
+                )
+            )
         }
     }
 }
@@ -43,6 +52,7 @@ pub struct DisplayManager {
     display_type: DisplayType,
     driver_manager: DisplayDriverManager
 } #[allow(dead_code)] impl DisplayManager {
+    /// Creates a new display manager. Be careful as multiple display managers will overwrite each other.
     pub fn new(display_type: DisplayType) -> Self {
         let display = display_type.new();
         let driver_manager = DisplayDriverManager::new();
@@ -50,24 +60,37 @@ pub struct DisplayManager {
         Self { display, display_type, driver_manager }
     }
 
+    /// Sets the display mode. This will in turn also set the driver for the display.
     pub fn set_mode(&mut self, mode: DisplayMode) {
         let driver = mode.get_driver();
+
+        match driver {
+            DisplayDriverType::Text(..) => {
+                if self.display_type != DisplayType::Buffered {
+                    panic!("Text mode can only be used with a buffered display!");
+                }
+            }, _ => {}
+        }
 
         self.driver_manager.set_driver(driver, self.display.clone());
     }
 
+    /// Returns the current driver type, which can be used to get the actual driver.
     pub fn get_driver(&mut self) -> &mut DisplayDriverType {
         &mut self.driver_manager.current_driver
     }
 
+    /// Returns the current display type.
     pub fn get_display_type(&self) -> DisplayType {
         self.display_type
     }
 
+    /// Clears the screen.
     pub fn clear_screen(&mut self) {
         self.driver_manager.clear(Colors::Black.into());
     }
 
+    /// Draws all the changes to the screen using the current driver.
     pub fn draw_all(&mut self) {
         self.driver_manager.draw_all();
     }

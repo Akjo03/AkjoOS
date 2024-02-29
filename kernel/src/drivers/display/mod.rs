@@ -1,11 +1,15 @@
 use alloc::sync::Arc;
 use spin::Mutex;
 use crate::api::display::{Color, Colors, DisplayApi, Fonts, Position, TextAlignment, TextBaseline, TextLineHeight};
+use crate::drivers::display::text::{TextDisplayDriver, TextDisplayDriverArgs};
+
+pub mod text;
 
 #[allow(dead_code)]
 pub enum DisplayDriverType {
     Unknown,
-    Dummy(DummyDisplayDriver)
+    Dummy(DummyDisplayDriver),
+    Text(TextDisplayDriver, TextDisplayDriverArgs)
 }
 
 trait DisplayDriver {
@@ -34,15 +38,19 @@ pub struct DisplayDriverManager {
         match &mut self.current_driver {
             DisplayDriverType::Dummy(driver) => {
                 driver.deactivate();
-            },
-            _ => {}
+            }, DisplayDriverType::Text(driver, ..) => {
+                driver.deactivate();
+            }, _ => {}
         }
         self.current_driver = driver;
         match &mut self.current_driver {
             DisplayDriverType::Dummy(driver) => {
                 driver.activate(display);
             },
-            _ => {}
+            DisplayDriverType::Text(driver, args) => {
+                driver.init(args);
+                driver.activate(display);
+            }, _ => {}
         }
     }
 
@@ -50,8 +58,9 @@ pub struct DisplayDriverManager {
         match &mut self.current_driver {
             DisplayDriverType::Dummy(driver) => {
                 driver.clear(color);
-            },
-            _ => {}
+            }, DisplayDriverType::Text(driver, ..) => {
+                driver.clear(color);
+            }, _ => {}
         }
     }
 
@@ -59,8 +68,9 @@ pub struct DisplayDriverManager {
         match &mut self.current_driver {
             DisplayDriverType::Dummy(driver) => {
                 driver.draw_all();
-            },
-            _ => {}
+            }, DisplayDriverType::Text(driver, ..) => {
+                driver.draw_all();
+            }, _ => {}
         }
     }
 

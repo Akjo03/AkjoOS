@@ -21,6 +21,15 @@ pub enum Event {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub enum EventErrorLevel {
+    Interrupt,
+    Trap,
+    Fault,
+    Abort,
+}
+
+#[derive(Debug, Clone)]
 pub enum ErrorEvent {
     Breakpoint(String),
     InvalidOpcode(String),
@@ -28,6 +37,28 @@ pub enum ErrorEvent {
     PageFault(String, u64),
     GeneralProtectionFault(String, u64),
     DoubleFault(String, u64)
+} #[allow(dead_code)] impl ErrorEvent {
+    pub fn message(&self) -> &String {
+        match self {
+            ErrorEvent::Breakpoint(message) => message,
+            ErrorEvent::InvalidOpcode(message) => message,
+            ErrorEvent::InvalidTss(message, ..) => message,
+            ErrorEvent::PageFault(message, ..) => message,
+            ErrorEvent::GeneralProtectionFault(message, ..) => message,
+            ErrorEvent::DoubleFault(message, ..) => message
+        }
+    }
+
+    pub fn level(&self) -> EventErrorLevel {
+        match self {
+            ErrorEvent::Breakpoint(..) => EventErrorLevel::Trap,
+            ErrorEvent::InvalidOpcode(..) => EventErrorLevel::Fault,
+            ErrorEvent::InvalidTss(..) => EventErrorLevel::Fault,
+            ErrorEvent::PageFault(..) => EventErrorLevel::Fault,
+            ErrorEvent::GeneralProtectionFault(..) => EventErrorLevel::Fault,
+            ErrorEvent::DoubleFault(..) => EventErrorLevel::Abort
+        }
+    }
 }
 
 pub trait EventHandler {
