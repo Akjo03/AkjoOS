@@ -8,7 +8,7 @@ pub struct TimeManager {
 } #[allow(dead_code)] impl TimeManager {
     pub fn new() -> Self {
         let clock = Arc::new(Mutex::new(SimpleClock::new()));
-        crate::internal::event::EventDispatcher::global().register(clock.clone());
+        crate::api::event::EventDispatcher::global().register(clock.clone());
         Self { clock }
     }
 

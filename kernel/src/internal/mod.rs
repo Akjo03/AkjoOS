@@ -4,7 +4,6 @@ pub mod heap;
 pub mod gdt;
 pub mod acpi;
 pub mod aml;
-pub mod event;
 pub mod idt;
 pub mod pic;
 pub mod cmos;

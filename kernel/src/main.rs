@@ -16,7 +16,7 @@ use bootloader_api::{BootInfo, BootloaderConfig};
 use bootloader_api::config::Mapping;
 use spin::Mutex;
 use x86_64::VirtAddr;
-use crate::internal::event::{ErrorEvent, Event, EventHandler};
+use crate::api::event::{ErrorEvent, Event, EventHandler};
 use crate::internal::pic::{PicInterrupts, PicMask};
 use crate::managers::time::TimeManager;
 
@@ -25,6 +25,7 @@ mod kernel;
 
 mod api;
 mod systems;
+mod drivers;
 mod managers;
 
 const BOOTLOADER_CONFIG: BootloaderConfig = {
@@ -145,13 +146,13 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     // Initialize kernel
     kernel.lock().init();
-    internal::event::EventDispatcher::global().register(kernel.clone());
+    api::event::EventDispatcher::global().register(kernel.clone());
     log::info!("Kernel initialized and registered as event handler.");
 
     // Main kernel loop
     log::info!("Kernel booted successfully. Entering main loop...");
     while kernel.lock().running.load(Ordering::SeqCst) {
-        internal::event::EventDispatcher::global().dispatch();
+        api::event::EventDispatcher::global().dispatch();
     }
 
     log::info!("Kernel needs to stop running. Shutting down...");

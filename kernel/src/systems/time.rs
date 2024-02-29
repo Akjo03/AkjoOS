@@ -1,5 +1,5 @@
 use crate::api::time::{DateTime, Month, TimeApi};
-use crate::internal::event::{Event, EventHandler};
+use crate::api::event::{Event, EventHandler};
 
 pub struct SimpleClock {
     current_time: DateTime

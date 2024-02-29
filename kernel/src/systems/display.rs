@@ -246,8 +246,8 @@ struct BufferedDisplayContext {
     back_buffer: Vec<u8>,
 } impl DisplayContext for BufferedDisplayContext {
     fn new() -> Self {
-        let fb_len = crate::internal::framebuffer::with_framebuffer(|_, info| {
-            info.stride * info.height
+        let fb_len = crate::internal::framebuffer::with_framebuffer(|fb, _| {
+            fb.len()
         }).unwrap_or_else(|| panic!("No framebuffer available when creating buffered display context!"));
 
         Self { back_buffer: vec![0; fb_len] }

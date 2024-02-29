@@ -1,7 +1,7 @@
 use alloc::format;
 use spin::Once;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
-use crate::internal::event::{ErrorEvent, Event};
+use crate::api::event::{ErrorEvent, Event};
 use crate::internal::pic::PicInterrupts;
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
@@ -50,7 +50,7 @@ pub fn disable_interrupts() {
 extern "x86-interrupt" fn timer_interrupt_handler(
     _stack_frame: InterruptStackFrame
 ) {
-    crate::internal::event::EventDispatcher::global().push(Event::Timer);
+    crate::api::event::EventDispatcher::global().push(Event::Timer);
     crate::internal::pic::end_of_interrupt(PicInterrupts::Timer);
 }
 
@@ -60,7 +60,7 @@ extern "x86-interrupt" fn rtc_interrupt_handler(
     let date_time = crate::internal::cmos::Cmos::global()
         .unwrap_or_else(|| panic!("CMOS not found!"))
         .lock().rtc();
-    crate::internal::event::EventDispatcher::global().push(Event::Rtc(date_time));
+    crate::api::event::EventDispatcher::global().push(Event::Rtc(date_time));
     crate::internal::pic::end_of_interrupt(PicInterrupts::RTC);
 }
 
@@ -68,39 +68,39 @@ extern "x86-interrupt" fn rtc_interrupt_handler(
 
 extern "x86-interrupt" fn breakpoint_handler(
     stack_frame: InterruptStackFrame
-) { crate::internal::event::EventDispatcher::global().push(Event::error(ErrorEvent::Breakpoint(
+) { crate::api::event::EventDispatcher::global().push(Event::error(ErrorEvent::Breakpoint(
     format!("{:#?}", stack_frame)
 ))) }
 
 extern "x86-interrupt" fn invalid_opcode_handler(
     stack_frame: InterruptStackFrame
-) { crate::internal::event::EventDispatcher::global().push(Event::error(ErrorEvent::InvalidOpcode(
+) { crate::api::event::EventDispatcher::global().push(Event::error(ErrorEvent::InvalidOpcode(
     format!("{:#?}", stack_frame)
 ))) }
 
 
 extern "x86-interrupt" fn invalid_tss_handler(
     stack_frame: InterruptStackFrame, error_code: u64
-) { crate::internal::event::EventDispatcher::global().push(Event::error(ErrorEvent::InvalidTss(
+) { crate::api::event::EventDispatcher::global().push(Event::error(ErrorEvent::InvalidTss(
     format!("{:#?}", stack_frame), error_code
 ))) }
 
 extern "x86-interrupt" fn page_fault_handler(
     stack_frame: InterruptStackFrame, error_code: PageFaultErrorCode
-) { crate::internal::event::EventDispatcher::global().push(Event::error(ErrorEvent::PageFault(
+) { crate::api::event::EventDispatcher::global().push(Event::error(ErrorEvent::PageFault(
     format!("{:#?}", stack_frame), error_code.bits()
 ))) }
 
 extern "x86-interrupt" fn general_protection_fault_handler(
     stack_frame: InterruptStackFrame, error_code: u64
-) { crate::internal::event::EventDispatcher::global().push(Event::error(ErrorEvent::GeneralProtectionFault(
+) { crate::api::event::EventDispatcher::global().push(Event::error(ErrorEvent::GeneralProtectionFault(
     format!("{:#?}", stack_frame), error_code
 ))) }
 
 extern "x86-interrupt" fn double_fault_handler(
     stack_frame: InterruptStackFrame, error_code: u64
 ) -> ! {
-    crate::internal::event::EventDispatcher::global().push(Event::error(ErrorEvent::DoubleFault(
+    crate::api::event::EventDispatcher::global().push(Event::error(ErrorEvent::DoubleFault(
         format!("{:#?}", stack_frame), error_code
     )));
     loop { x86_64::instructions::hlt(); }
