@@ -39,7 +39,7 @@ impl KernelRuntime for Kernel {
                 log::error!("Kernel encountered a fault: {}", event.message());
             }, EventErrorLevel::Abort => {
                 crate::abort(&format!(
-                    "\n Kernel encountered and unrecoverable error: {}",
+                    "\n Kernel encountered an unrecoverable error: {}",
                     event.message()
                 ), Some(&mut self.display_manager))
             }, _ => {}
