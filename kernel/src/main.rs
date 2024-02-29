@@ -17,7 +17,9 @@ use bootloader_api::config::Mapping;
 use spin::Mutex;
 use x86_64::VirtAddr;
 use crate::api::event::{ErrorEvent, Event, EventHandler};
+use crate::drivers::display::DisplayDriverType;
 use crate::internal::pic::{PicInterrupts, PicMask};
+use crate::managers::display::{DisplayManager, DisplayMode, DisplayType};
 use crate::managers::time::TimeManager;
 
 mod internal;
@@ -136,12 +138,19 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         )
     }
 
-    // Initialize new time manager
+    // Initialize time manager
     let time_manager = TimeManager::new();
     log::info!("Time manager initialized.");
 
+    // Initialize display manager
+    let mut display_manager = DisplayManager::new(DisplayType::Buffered);
+    display_manager.set_mode(DisplayMode::Dummy);
+    display_manager.clear_screen();
+    log::info!("Display manager initialized.");
+
     let kernel = Arc::new(Mutex::new(Kernel::new(
-        time_manager
+        time_manager,
+        display_manager
     )));
 
     // Initialize kernel
@@ -176,13 +185,16 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 #[allow(dead_code)]
 pub struct Kernel {
     time_manager: TimeManager,
+    display_manager: DisplayManager,
     pub tick: AtomicU64,
     pub running: AtomicBool
 } impl Kernel {
     pub fn new(
-        time_manager: TimeManager
+        time_manager: TimeManager,
+        display_manager: DisplayManager
     ) -> Self { Self {
         time_manager,
+        display_manager,
         tick: AtomicU64::new(0),
         running: AtomicBool::new(true)
     } }
@@ -218,10 +230,28 @@ fn panic(panic_info: &PanicInfo) -> ! {
         "Unknown panic payload."
     };
 
-    abort(payload_message)
+    internal::framebuffer::is_initialized().then(|| {
+        let mut display_manager = DisplayManager::new(DisplayType::Simple);
+        display_manager.set_mode(DisplayMode::Dummy);
+        display_manager.clear_screen();
+
+        abort(payload_message, Some(&mut display_manager));
+    });
+
+    abort(payload_message, None);
 }
 
-fn abort(message: &str) -> ! {
+fn abort(message: &str, display_manager: Option<&mut DisplayManager>) -> ! {
     log::error!("Kernel panicked with message '{}'", message);
+
+    if let Some(display_manager) = display_manager {
+        match display_manager.get_driver() {
+            DisplayDriverType::Dummy(driver) => {
+                driver.draw_panic(message);
+            }, _ => {}
+        }
+        display_manager.draw_all();
+    }
+
     loop { x86_64::instructions::hlt(); }
 }

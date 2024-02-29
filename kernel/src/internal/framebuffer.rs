@@ -28,3 +28,10 @@ pub fn with_framebuffer<F, R>(func: F) -> Option<R>
         Some(func(fb, *info))
     } else { None }
 }
+
+pub fn is_initialized() -> bool {
+    let fb_guard = FRAMEBUFFER.lock();
+    let info_guard = FRAMEBUFFER_INFO.lock();
+
+    fb_guard.is_some() && info_guard.is_some()
+}
