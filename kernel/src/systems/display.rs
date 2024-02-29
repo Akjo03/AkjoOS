@@ -12,30 +12,29 @@ use embedded_graphics::text::{DecorationColor, Text, TextStyle};
 use embedded_graphics::text::renderer::CharacterStyle;
 use crate::api::display::{Color, DisplayApi, Position, TextAlignment, TextBaseline, TextLineHeight};
 
-trait DisplayContext<'a> {
-    fn new(frame_buffer: &'a mut [u8], frame_buffer_info: FrameBufferInfo) -> Self;
+trait DisplayContext {
+    fn new() -> Self;
     fn set_pixel(&mut self, position: Position, color: Color);
     fn swap(&mut self);
 }
 
-pub struct SimpleDisplay<'a> {
-    context: SimpleDisplayContext<'a>
-} impl<'a> SimpleDisplay<'a> {
-    pub fn new(
-        frame_buffer: &'a mut [u8],
-        frame_buffer_info: FrameBufferInfo
-    ) -> Self { Self {
-        context: SimpleDisplayContext::new(frame_buffer, frame_buffer_info)
-    } }
-} impl DisplayApi for SimpleDisplay<'_> {
+pub struct SimpleDisplay {
+    context: SimpleDisplayContext
+} impl SimpleDisplay {
+    pub fn new() -> Self {
+        Self { context: SimpleDisplayContext::new() }
+    }
+} impl DisplayApi for SimpleDisplay {
     fn draw(&mut self, buffer: &[u8]) {
-        if buffer.len() != self.context.frame_buffer.len() {
-            panic!("Frame buffer data does not match the expected size!");
-        }
+        crate::internal::framebuffer::with_framebuffer(|fb, _| {
+            if buffer.len() != fb.len() {
+                panic!("Frame buffer data does not match the expected size!");
+            }
 
-        for (i, byte) in buffer.iter().enumerate() {
-            self.context.frame_buffer[i] = *byte;
-        }
+            for (i, byte) in buffer.iter().enumerate() {
+                fb[i] = *byte;
+            }
+        }).unwrap_or_else(|| panic!("No framebuffer available when drawing to display!"));
     }
 
     fn draw_char(
@@ -94,23 +93,28 @@ pub struct SimpleDisplay<'a> {
     }
 
     fn clear(&mut self, color: Color) {
-        for byte_offset in (0..self.context.frame_buffer.len()).step_by(self.context.frame_buffer_info.bytes_per_pixel) {
-            set_pixel_in_at(self.context.frame_buffer, self.context.frame_buffer_info, byte_offset, color);
-        }
+        crate::internal::framebuffer::with_framebuffer(|fb, info| {
+            for byte_offset in (0..fb.len()).step_by(info.bytes_per_pixel) {
+                set_pixel_in_at(fb, info, byte_offset, color);
+            }
+        }).unwrap_or_else(|| panic!("No framebuffer available when clearing display!"));
     }
 
     fn swap(&mut self) { self.context.swap(); }
 
-    fn get_info(&self) -> FrameBufferInfo { self.context.frame_buffer_info }
+    fn get_info(&self) -> FrameBufferInfo {
+        crate::internal::framebuffer::with_framebuffer(|_, info| info)
+            .unwrap_or_else(|| panic!("No framebuffer available when getting info!"))
+    }
 }
 
-pub struct BufferedDisplay<'a> {
-    context: BufferedDisplayContext<'a>
-} impl<'a> BufferedDisplay<'a> {
-    pub fn new(frame_buffer: &'a mut [u8], frame_buffer_info: FrameBufferInfo) -> Self {
-        Self { context: BufferedDisplayContext::new(frame_buffer, frame_buffer_info) }
+pub struct BufferedDisplay {
+    context: BufferedDisplayContext
+} impl BufferedDisplay {
+    pub fn new() -> Self {
+        Self { context: BufferedDisplayContext::new() }
     }
-} impl DisplayApi for BufferedDisplay<'_> {
+} impl DisplayApi for BufferedDisplay {
     fn draw(&mut self, buffer: &[u8]) {
         if buffer.len() != self.context.back_buffer.len() {
             panic!("Buffer data does not match the expected size!");
@@ -177,40 +181,39 @@ pub struct BufferedDisplay<'a> {
     }
 
     fn clear(&mut self, color: Color) {
-        for byte_offset in (0..self.context.frame_buffer.len()).step_by(self.context.frame_buffer_info.bytes_per_pixel) {
-            set_pixel_in_at(self.context.back_buffer.as_mut_slice(), self.context.frame_buffer_info, byte_offset, color);
-        }
+        crate::internal::framebuffer::with_framebuffer(|_, info| {
+            for byte_offset in (0..self.context.back_buffer.len()).step_by(info.bytes_per_pixel) {
+                set_pixel_in_at(&mut self.context.back_buffer, info, byte_offset, color);
+            }
+        }).unwrap_or_else(|| panic!("No framebuffer available when clearing display!"));
     }
 
     fn swap(&mut self) { self.context.swap(); }
 
-    fn get_info(&self) -> FrameBufferInfo { self.context.frame_buffer_info }
+    fn get_info(&self) -> FrameBufferInfo {
+        crate::internal::framebuffer::with_framebuffer(|_, info| info)
+            .unwrap_or_else(|| panic!("No framebuffer available when getting info!"))
+    }
 }
 
-struct SimpleDisplayContext<'a> {
-    frame_buffer: &'a mut [u8],
-    frame_buffer_info: FrameBufferInfo
-} impl<'a> DisplayContext<'a> for SimpleDisplayContext<'a> {
-    fn new(
-        frame_buffer: &'a mut [u8],
-        frame_buffer_info: FrameBufferInfo
-    ) -> Self { Self {
-        frame_buffer,
-        frame_buffer_info
-    } }
+struct SimpleDisplayContext;
+impl DisplayContext for SimpleDisplayContext {
+    fn new() -> Self { Self {} }
 
     fn set_pixel(&mut self, position: Position, color: Color) {
-        let byte_offset = {
-            let line_offset = position.y * self.frame_buffer_info.stride;
-            let pixel_offset = line_offset + position.x;
-            pixel_offset * self.frame_buffer_info.bytes_per_pixel
-        };
+        crate::internal::framebuffer::with_framebuffer(|fb, info| {
+            let byte_offset = {
+                let line_offset = position.y * info.stride;
+                let pixel_offset = line_offset + position.x;
+                pixel_offset * info.bytes_per_pixel
+            };
 
-        set_pixel_in_at(self.frame_buffer, self.frame_buffer_info, byte_offset, color);
+            set_pixel_in_at(fb, info, byte_offset, color);
+        }).unwrap_or_else(|| panic!("No framebuffer available when setting pixel!"));
     }
 
     fn swap(&mut self) {}
-} impl DrawTarget for SimpleDisplayContext<'_> {
+} impl DrawTarget for SimpleDisplayContext {
     type Color = Rgb888;
     type Error = core::convert::Infallible;
 
@@ -231,47 +234,50 @@ struct SimpleDisplayContext<'a> {
 
         Ok(())
     }
-} impl Dimensions for SimpleDisplayContext<'_> {
+} impl Dimensions for SimpleDisplayContext {
     fn bounding_box(&self) -> Rectangle {
-        get_bounds(self.frame_buffer_info)
+        crate::internal::framebuffer::with_framebuffer(|_, info| {
+            get_bounds(info)
+        }).unwrap_or_else(|| panic!("No framebuffer available when getting bounds!"))
     }
 }
 
-struct BufferedDisplayContext<'a> {
-    frame_buffer: &'a mut [u8],
+struct BufferedDisplayContext {
     back_buffer: Vec<u8>,
-    frame_buffer_info: FrameBufferInfo
-} impl<'a> DisplayContext<'a> for BufferedDisplayContext<'a> {
-    fn new(frame_buffer: &'a mut [u8], frame_buffer_info: FrameBufferInfo) -> Self {
-        let back_buffer = vec![0; frame_buffer.len()];
-        Self {
-            frame_buffer,
-            back_buffer,
-            frame_buffer_info
-        }
+} impl DisplayContext for BufferedDisplayContext {
+    fn new() -> Self {
+        let fb_len = crate::internal::framebuffer::with_framebuffer(|_, info| {
+            info.stride * info.height
+        }).unwrap_or_else(|| panic!("No framebuffer available when creating buffered display context!"));
+
+        Self { back_buffer: vec![0; fb_len] }
     }
 
     fn set_pixel(&mut self, position: Position, color: Color) {
-        let byte_offset = {
-            let line_offset = position.y * self.frame_buffer_info.stride;
-            let pixel_offset = line_offset + position.x;
-            pixel_offset * self.frame_buffer_info.bytes_per_pixel
-        };
+        crate::internal::framebuffer::with_framebuffer(|_, info| {
+            let byte_offset = {
+                let line_offset = position.y * info.stride;
+                let pixel_offset = line_offset + position.x;
+                pixel_offset * info.bytes_per_pixel
+            };
 
-        set_pixel_in_at(self.back_buffer.as_mut_slice(), self.frame_buffer_info, byte_offset, color);
+            set_pixel_in_at(&mut self.back_buffer, info, byte_offset, color);
+        }).unwrap_or_else(|| panic!("No framebuffer available when setting pixel!"));
     }
 
     fn swap(&mut self) {
-        let frame_buffer_len = self.frame_buffer.len();
-        let back_buffer_len = self.back_buffer.len();
+        crate::internal::framebuffer::with_framebuffer(|fb, _| {
+            let frame_buffer_len = fb.len();
+            let back_buffer_len = self.back_buffer.len();
 
-        if frame_buffer_len != back_buffer_len {
-            panic!("Frame buffer and back buffer sizes do not match!");
-        }
+            if frame_buffer_len != back_buffer_len {
+                panic!("Frame buffer and back buffer lengths do not match!");
+            }
 
-        self.frame_buffer.copy_from_slice(&self.back_buffer);
+            fb.copy_from_slice(&self.back_buffer);
+        }).unwrap_or_else(|| panic!("No framebuffer available when swapping display!"));
     }
-} impl DrawTarget for BufferedDisplayContext<'_> {
+} impl DrawTarget for BufferedDisplayContext {
     type Color = Rgb888;
     type Error = core::convert::Infallible;
 
@@ -292,18 +298,20 @@ struct BufferedDisplayContext<'a> {
 
         Ok(())
     }
-} impl Dimensions for BufferedDisplayContext<'_> {
+} impl Dimensions for BufferedDisplayContext {
     fn bounding_box(&self) -> Rectangle {
-        get_bounds(self.frame_buffer_info)
+        crate::internal::framebuffer::with_framebuffer(|_, info| {
+            get_bounds(info)
+        }).unwrap_or_else(|| panic!("No framebuffer available when getting bounds!"))
     }
 }
 
-fn get_bounds(frame_buffer_info: FrameBufferInfo) -> Rectangle {
+fn get_bounds(info: FrameBufferInfo) -> Rectangle {
     Rectangle::new(
         Point::new(0, 0),
         embedded_graphics::geometry::Size::new(
-            frame_buffer_info.width as u32,
-            frame_buffer_info.height as u32
+            info.width as u32,
+            info.height as u32
         )
     )
 }
@@ -316,13 +324,16 @@ fn set_pixel_in_at(frame_buffer: &mut [u8], frame_buffer_info: FrameBufferInfo, 
             pixel_buffer[0] = color.red;
             pixel_buffer[1] = color.green;
             pixel_buffer[2] = color.blue;
-        }, PixelFormat::Bgr => {
+        },
+        PixelFormat::Bgr => {
             pixel_buffer[0] = color.blue;
             pixel_buffer[1] = color.green;
             pixel_buffer[2] = color.red;
-        }, PixelFormat::U8 => {
+        },
+        PixelFormat::U8 => {
             let gray = color.red / 3 + color.green / 3 + color.blue / 3;
             pixel_buffer[0] = gray;
-        }, other => panic!("Unsupported pixel format: {:?}", other)
+        },
+        other => panic!("Unsupported pixel format: {:?}", other)
     }
 }
