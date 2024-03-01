@@ -1,6 +1,7 @@
 use alloc::borrow::Cow;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
+use alloc::vec;
 use alloc::vec::Vec;
 use embedded_graphics::mono_font::MonoFont;
 use spin::{Mutex, RwLock};
@@ -153,31 +154,42 @@ pub enum ScrollDirection {
     Up, Down
 }
 
-pub const BUFFER_WIDTH: usize = 80;
-pub const BUFFER_HEIGHT: usize = 25;
-
 pub struct TextDisplayDriverArgs {
     font: Arc<RwLock<Fonts>>,
+    buffer_size: Arc<RwLock<Size>>
 } #[allow(dead_code)] impl TextDisplayDriverArgs {
-    pub fn new(font: Arc<RwLock<Fonts>>) -> Self {
-        Self { font }
+    pub fn new(
+        font: Arc<RwLock<Fonts>>,
+        buffer_size: Arc<RwLock<Size>>,
+    ) -> Self {
+        Self { font, buffer_size }
     }
 }
 
 pub struct TextDisplayDriver {
     display: Option<Arc<Mutex<dyn DisplayApi + Send>>>,
     font: Option<Fonts>,
-    text_buffer: [ScreenChar; BUFFER_WIDTH * BUFFER_HEIGHT],
+    text_buffer: Vec<ScreenChar>,
     text_cursor: Position,
-    dirty_buffer: [bool; BUFFER_WIDTH * BUFFER_HEIGHT],
+    dirty_buffer: Vec<bool>,
     text_color: TextColor,
     background_color: TextColor,
     underline: bool,
     strikethrough: bool,
-    blink: bool
+    blink: bool,
+    buffer_width: usize,
+    buffer_height: usize
 } #[allow(dead_code)] impl TextDisplayDriver {
     pub fn init(&mut self, args: &mut TextDisplayDriverArgs) {
         self.font = Some(args.font.read().clone());
+        self.buffer_width = (*args.buffer_size.read()).width;
+        self.buffer_height = (*args.buffer_size.read()).height;
+        self.text_buffer = vec![ScreenChar::new(
+            ' ',
+            ColorCode::new(TextColor::Black, TextColor::Black),
+            CharacterAttributes::new(false, false)
+        ); self.buffer_width * self.buffer_height];
+        self.dirty_buffer = vec![false; self.buffer_width * self.buffer_height];
     }
 
 
@@ -256,7 +268,7 @@ pub struct TextDisplayDriver {
 
     /// Clears a specific cell in the text buffer.
     pub fn clear_cell(&mut self, row: usize, col: usize) {
-        let index = row * BUFFER_WIDTH + col;
+        let index = row * self.buffer_width + col;
         self.text_buffer[index] = ScreenChar::new(
             ' ',
             ColorCode::new(self.background_color, self.background_color),
@@ -284,9 +296,9 @@ pub struct TextDisplayDriver {
             CharacterAttributes::new(self.underline, self.strikethrough)
         );
 
-        for row in 0..BUFFER_HEIGHT {
-            for col in 0..BUFFER_WIDTH {
-                let index = row * BUFFER_WIDTH + col;
+        for row in 0..self.buffer_height {
+            for col in 0..self.buffer_width {
+                let index = row * self.buffer_width + col;
                 self.text_buffer[index] = screen_char;
                 self.dirty_buffer[index] = true;
             }
@@ -303,7 +315,7 @@ pub struct TextDisplayDriver {
 
         for row in region.position.y..(region.position.y + region.size.height) {
             for col in region.position.x..(region.position.x + region.size.width) {
-                let index = row * BUFFER_WIDTH + col;
+                let index = row * self.buffer_width + col;
                 self.text_buffer[index] = screen_char;
                 self.dirty_buffer[index] = true;
             }
@@ -315,39 +327,39 @@ pub struct TextDisplayDriver {
     pub fn scroll(&mut self, lines: usize, direction: ScrollDirection) {
         if lines == 0 { return; }
 
-        if lines >= BUFFER_HEIGHT {
+        if lines >= self.buffer_height {
             self.clear_buffer();
             return;
         }
 
         match direction {
             ScrollDirection::Up => {
-                for row in 0..(BUFFER_HEIGHT - lines) {
-                    for col in 0..BUFFER_WIDTH {
-                        let from_index = (row + lines) * BUFFER_WIDTH + col;
-                        let to_index = row * BUFFER_WIDTH + col;
+                for row in 0..(self.buffer_height - lines) {
+                    for col in 0..self.buffer_width {
+                        let from_index = (row + lines) * self.buffer_width + col;
+                        let to_index = row * self.buffer_width + col;
                         self.text_buffer[to_index] = self.text_buffer[from_index];
                         self.dirty_buffer[to_index] = true;
                     }
                 }
-                for row in (BUFFER_HEIGHT - lines)..BUFFER_HEIGHT {
-                    for col in 0..BUFFER_WIDTH {
+                for row in (self.buffer_height - lines)..self.buffer_height {
+                    for col in 0..self.buffer_width {
                         self.clear_cell(row, col);
                     }
                 }
 
                 self.move_cursor(Position::new(self.text_cursor.x, self.text_cursor.y - lines));
             }, ScrollDirection::Down => {
-                for row in (lines..BUFFER_HEIGHT).rev() {
-                    for col in 0..BUFFER_WIDTH {
-                        let from_index = (row - lines) * BUFFER_WIDTH + col;
-                        let to_index = row * BUFFER_WIDTH + col;
+                for row in (lines..self.buffer_height).rev() {
+                    for col in 0..self.buffer_width {
+                        let from_index = (row - lines) * self.buffer_width + col;
+                        let to_index = row * self.buffer_width + col;
                         self.text_buffer[to_index] = self.text_buffer[from_index];
                         self.dirty_buffer[to_index] = true;
                     }
                 }
                 for row in 0..lines {
-                    for col in 0..BUFFER_WIDTH {
+                    for col in 0..self.buffer_width {
                         self.clear_cell(row, col);
                     }
                 }
@@ -371,7 +383,7 @@ pub struct TextDisplayDriver {
     /// and the second one indicating if the y position is valid.
     #[inline]
     pub fn validate_position(&mut self, position: Position) -> (bool, bool) {
-        (position.x < BUFFER_WIDTH, position.y < BUFFER_HEIGHT)
+        (position.x < self.buffer_width, position.y < self.buffer_height)
     }
 
     /// Validates a specific region in the text buffer.
@@ -382,8 +394,8 @@ pub struct TextDisplayDriver {
         let end_x = region.position.x + region.size.width;
         let end_y = region.position.y + region.size.height;
 
-        let x_valid_end = end_x < BUFFER_WIDTH;
-        let y_valid_end = end_y < BUFFER_HEIGHT;
+        let x_valid_end = end_x < self.buffer_width;
+        let y_valid_end = end_y < self.buffer_height;
 
         x_valid && y_valid && x_valid_end && y_valid_end
     }
@@ -414,7 +426,7 @@ pub struct TextDisplayDriver {
 
     #[inline]
     fn write_at(&mut self, character: ScreenChar, position: Position) {
-        let index = position.y * BUFFER_WIDTH + position.x;
+        let index = position.y * self.buffer_width + position.x;
         self.text_buffer[index] = character;
         self.dirty_buffer[index] = true;
     }
@@ -448,7 +460,7 @@ pub struct TextDisplayDriver {
                         current_text.clear();
                     }
 
-                    let index = y * BUFFER_WIDTH + x;
+                    let index = y * self.buffer_width + x;
                     let screen_char = self.text_buffer[index];
                     let char_color = screen_char.color();
                     let char_attributes = screen_char.attributes();
@@ -498,11 +510,11 @@ pub struct TextDisplayDriver {
 
     fn get_dirty_regions(&mut self) -> Vec<Region> {
         let mut regions = Vec::new();
-        let mut visited = [false; BUFFER_WIDTH * BUFFER_HEIGHT];
+        let mut visited = vec![false; self.buffer_width * self.buffer_height];
 
-        for y in 0..BUFFER_HEIGHT {
-            for x in 0..BUFFER_WIDTH {
-                let index = y * BUFFER_WIDTH + x;
+        for y in 0..self.buffer_height {
+            for x in 0..self.buffer_width {
+                let index = y * self.buffer_width + x;
                 if self.dirty_buffer[index] && !visited[index] {
                     let mut bounds = (x, x, y, y);
                     self.dfs(x, y, &mut visited, &mut bounds);
@@ -521,11 +533,11 @@ pub struct TextDisplayDriver {
 
     fn dfs(
         &mut self, x: usize, y: usize,
-        visited: &mut [bool; BUFFER_WIDTH * BUFFER_HEIGHT],
+        visited: &mut Vec<bool>,
         bounds: &mut (usize, usize, usize, usize)
     ) {
-        let index = y * BUFFER_WIDTH + x;
-        if x >= BUFFER_WIDTH || y >= BUFFER_HEIGHT || visited[index] || !self.dirty_buffer[index] {
+        let index = y * self.buffer_width + x;
+        if x >= self.buffer_width || y >= self.buffer_height || visited[index] || !self.dirty_buffer[index] {
             return;
         }
 
@@ -536,17 +548,17 @@ pub struct TextDisplayDriver {
         bounds.3 = bounds.3.max(y);
 
         if x > 0 { self.dfs(x - 1, y, visited, bounds); }
-        if x < BUFFER_WIDTH - 1 { self.dfs(x + 1, y, visited, bounds); }
+        if x < self.buffer_width - 1 { self.dfs(x + 1, y, visited, bounds); }
         if y > 0 { self.dfs(x, y - 1, visited, bounds); }
-        if y < BUFFER_HEIGHT - 1 { self.dfs(x, y + 1, visited, bounds); }
+        if y < self.buffer_height - 1 { self.dfs(x, y + 1, visited, bounds); }
     }
 
     fn map_position(&mut self, text_position: Position) -> Position {
         if let Some(font) = self.font.as_ref() {
-            let font: MonoFont = (*font).into();
+            let font_size = font.get_size();
 
-            let screen_x = text_position.x * font.character_size.width as usize;
-            let screen_y = text_position.y * font.character_size.height as usize;
+            let screen_x = text_position.x * font_size.width;
+            let screen_y = text_position.y * font_size.height;
             return Position::new(screen_x, screen_y);
         }
 
@@ -556,18 +568,16 @@ pub struct TextDisplayDriver {
     fn new() -> Self { Self {
         display: None,
         font: None,
-        text_buffer: [ScreenChar::new(
-            ' ',
-            ColorCode::new(TextColor::Black, TextColor::Black),
-            CharacterAttributes::new(false, false)
-        ); BUFFER_WIDTH * BUFFER_HEIGHT],
+        text_buffer: Vec::new(),
         text_cursor: Position::new(0, 0),
-        dirty_buffer: [false; BUFFER_WIDTH * BUFFER_HEIGHT],
+        dirty_buffer: Vec::new(),
         text_color: TextColor::White,
         background_color: TextColor::Black,
         underline: false,
         strikethrough: false,
-        blink: false
+        blink: false,
+        buffer_width: 0,
+        buffer_height: 0
     } }
 
     fn draw_all(&mut self) {
