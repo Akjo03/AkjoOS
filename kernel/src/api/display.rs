@@ -9,6 +9,8 @@ use embedded_graphics::{
     },
     primitives::Rectangle,
 };
+use embedded_vintage_fonts::{FONT_6X8,FONT_8X16,FONT_12X16,FONT_24X32};
+use profont::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Position {
@@ -100,22 +102,38 @@ pub enum Colors {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum Fonts {
-    Font6x9, Font6x10, Font6x12,
+    ProFont5x10,
+    Font6x8,
+    Font6x9,
+    Font6x10,
+    ProFont6x11,
+    Font6x12, ProFont7x12,
     Font6x13, Font6x13B, Font6x13I,
     Font7x13, Font7x13B, Font7x13I,
     Font7x14, Font7x14B,
+    ProFont8x15,
     Font8x13, Font8x13B, Font8x13I,
+    Font8x16,
     Font9x15, Font9x15B,
     Font9x18, Font9x18B,
+    ProFont10x17,
     Font10x20,
+    Font12x16,
+    ProFont12x22,
+    ProFont16x29,
+    Font24x32,
 } #[allow(dead_code)] impl Fonts {
     pub fn get_size(self) -> Size { match self {
+        Fonts::ProFont5x10 => Size::new(5, 10),
+        Fonts::Font6x8 => Size::new(6, 8),
         Fonts::Font6x9 => Size::new(6, 9),
         Fonts::Font6x10 => Size::new(6, 10),
+        Fonts::ProFont6x11 => Size::new(6, 11),
         Fonts::Font6x12 => Size::new(6, 12),
         Fonts::Font6x13 => Size::new(6, 13),
         Fonts::Font6x13B => Size::new(6, 13),
         Fonts::Font6x13I => Size::new(6, 13),
+        Fonts::ProFont7x12 => Size::new(7, 12),
         Fonts::Font7x13 => Size::new(7, 13),
         Fonts::Font7x13B => Size::new(7, 13),
         Fonts::Font7x13I => Size::new(7, 13),
@@ -124,20 +142,31 @@ pub enum Fonts {
         Fonts::Font8x13 => Size::new(8, 13),
         Fonts::Font8x13B => Size::new(8, 13),
         Fonts::Font8x13I => Size::new(8, 13),
+        Fonts::ProFont8x15 => Size::new(8, 15),
+        Fonts::Font8x16 => Size::new(8, 16),
         Fonts::Font9x15 => Size::new(9, 15),
         Fonts::Font9x15B => Size::new(9, 15),
         Fonts::Font9x18 => Size::new(9, 18),
         Fonts::Font9x18B => Size::new(9, 18),
+        Fonts::ProFont10x17 => Size::new(10, 17),
         Fonts::Font10x20 => Size::new(10, 20),
+        Fonts::Font12x16 => Size::new(12, 16),
+        Fonts::ProFont12x22 => Size::new(12, 22),
+        Fonts::ProFont16x29 => Size::new(16, 29),
+        Fonts::Font24x32 => Size::new(24, 32),
     }}
 } #[allow(dead_code)] impl Into<MonoFont<'_>> for Fonts {
     fn into(self) -> MonoFont<'static> { match self {
+        Fonts::ProFont5x10 => PROFONT_7_POINT,
+        Fonts::Font6x8 => FONT_6X8,
         Fonts::Font6x9 => FONT_6X9,
         Fonts::Font6x10 => FONT_6X10,
+        Fonts::ProFont6x11 => PROFONT_9_POINT,
         Fonts::Font6x12 => FONT_6X12,
         Fonts::Font6x13 => FONT_6X13,
         Fonts::Font6x13B => FONT_6X13_BOLD,
         Fonts::Font6x13I => FONT_6X13_ITALIC,
+        Fonts::ProFont7x12 => PROFONT_10_POINT,
         Fonts::Font7x13 => FONT_7X13,
         Fonts::Font7x13B => FONT_7X13_BOLD,
         Fonts::Font7x13I => FONT_7X13_ITALIC,
@@ -146,14 +175,21 @@ pub enum Fonts {
         Fonts::Font8x13 => FONT_8X13,
         Fonts::Font8x13B => FONT_8X13_BOLD,
         Fonts::Font8x13I => FONT_8X13_ITALIC,
+        Fonts::ProFont8x15 => PROFONT_12_POINT,
+        Fonts::Font8x16 => FONT_8X16,
         Fonts::Font9x15 => FONT_9X15,
         Fonts::Font9x15B => FONT_9X15_BOLD,
         Fonts::Font9x18 => FONT_9X18,
         Fonts::Font9x18B => FONT_9X18_BOLD,
+        Fonts::ProFont10x17 => PROFONT_14_POINT,
         Fonts::Font10x20 => FONT_10X20,
+        Fonts::Font12x16 => FONT_12X16,
+        Fonts::ProFont12x22 => PROFONT_18_POINT,
+        Fonts::ProFont16x29 => PROFONT_24_POINT,
+        Fonts::Font24x32 => FONT_24X32,
     } }
 } impl Default for Fonts {
-    fn default() -> Self { Fonts::Font10x20 }
+    fn default() -> Self { Fonts::ProFont10x17 }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
