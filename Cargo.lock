@@ -317,6 +317,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "embedded-vintage-fonts"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3703d421b4cf1d3b44cbed1daac7cee013c9eeceb4611f01b3d5e2258335699f"
+dependencies = [
+ "embedded-graphics",
+]
+
+[[package]]
 name = "errno"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -617,6 +626,7 @@ dependencies = [
  "bit_field",
  "bootloader_api",
  "embedded-graphics",
+ "embedded-vintage-fonts",
  "lazy_static",
  "linked_list_allocator",
  "log",
