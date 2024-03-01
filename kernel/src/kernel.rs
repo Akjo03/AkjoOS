@@ -24,6 +24,10 @@ impl KernelRuntime for Kernel {
                         |clock| clock.now().to_string()
                     ).unwrap_or("N/A".to_string())
                 ).as_str());
+
+                if current_tick % 500 == 0 {
+                    driver.blink();
+                }
             }, _ => {}
         }
         self.display_manager.draw_all();
