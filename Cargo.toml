@@ -12,8 +12,8 @@ default-run = "qemu-uefi"
 cpu_count = "2"
 vga_xres = "1920"
 vga_yres = "1080"
-vga_mem = "64"
-mem_size = "128M"
+vga_mem = "128"
+mem_size = "256M"
 accel_enabled = "true"
 
 [dependencies]
