@@ -3,13 +3,16 @@ use alloc::string::ToString;
 use core::sync::atomic::Ordering;
 use crate::api::event::{ErrorEvent, EventErrorLevel};
 use crate::{KernelRuntime, Kernel};
-use crate::api::display::Fonts;
+use crate::api::display::{Fonts, Size};
 use crate::drivers::display::DisplayDriverType;
 use crate::managers::display::DisplayMode;
 
 impl KernelRuntime for Kernel {
     fn init(&mut self) {
-        self.display_manager.set_mode(DisplayMode::Text(Fonts::default()));
+        self.display_manager.set_mode(DisplayMode::Text(
+            Fonts::default(),
+            Size::new(80, 25)
+        ));
     }
 
     fn tick(&mut self) {
@@ -50,5 +53,7 @@ impl KernelRuntime for Kernel {
         }
     }
 
-    fn halt(&mut self) {}
+    fn halt(&mut self) {
+        self.display_manager.clear_screen();
+    }
 }

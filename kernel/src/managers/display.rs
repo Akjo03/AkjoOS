@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use spin::Mutex;
 use spin::rwlock::RwLock;
-use crate::api::display::{Colors, DisplayApi, Fonts};
+use crate::api::display::{Colors, DisplayApi, Fonts, Size};
 use crate::drivers::display::{CommonDisplayDriver, DisplayDriverManager, DisplayDriverType, DummyDisplayDriver};
 use crate::drivers::display::text::{TextDisplayDriver, TextDisplayDriverArgs};
 use crate::systems::display::{BufferedDisplay, SimpleDisplay};
@@ -11,17 +11,18 @@ use crate::systems::display::{BufferedDisplay, SimpleDisplay};
 pub enum DisplayMode {
     Unknown,
     Dummy,
-    Text(Fonts)
+    Text(Fonts, Size)
 } impl DisplayMode {
     fn get_driver(self) -> DisplayDriverType {
         match self {
             DisplayMode::Unknown => DisplayDriverType::Unknown,
             DisplayMode::Dummy => DisplayDriverType::Dummy(
                 DummyDisplayDriver::new()
-            ), DisplayMode::Text(font) => DisplayDriverType::Text(
+            ), DisplayMode::Text(font, size) => DisplayDriverType::Text(
                 TextDisplayDriver::new(),
                 TextDisplayDriverArgs::new(
-                    Arc::new(RwLock::new(font))
+                    Arc::new(RwLock::new(font)),
+                    Arc::new(RwLock::new(size))
                 )
             )
         }
