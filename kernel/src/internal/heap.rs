@@ -11,7 +11,7 @@ pub const INITIAL_HEAP_START: usize = 0x_1111_1111_0000;
 pub const INITIAL_HEAP_SIZE: usize = 1024 * 1024 * 2; // 2 MiB
 
 pub const MAIN_HEAP_START: usize = 0x_4444_4444_0000;
-pub const MAIN_HEAP_SIZE: usize = 1024 * 1024 * 64; // 64 MiB
+pub const MAIN_HEAP_SIZE: usize = 1024 * 1024 * 128; // 128 MiB
 
 #[global_allocator]
 static ALLOCATOR: HeapManager = HeapManager::new();
