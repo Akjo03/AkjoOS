@@ -10,8 +10,8 @@ use crate::managers::display::DisplayMode;
 impl KernelRuntime for Kernel {
     fn init(&mut self) {
         self.display_manager.set_mode(DisplayMode::Text(
-            Fonts::default(),
-            Size::new(80, 25)
+            Size::new(80, 25),
+            Fonts::default()
         ));
     }
 

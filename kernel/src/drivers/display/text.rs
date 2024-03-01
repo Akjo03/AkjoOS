@@ -155,23 +155,23 @@ pub enum ScrollDirection {
 }
 
 pub struct TextDisplayDriverArgs {
+    buffer_size: Arc<RwLock<Size>>,
     font: Arc<RwLock<Fonts>>,
-    buffer_size: Arc<RwLock<Size>>
 } #[allow(dead_code)] impl TextDisplayDriverArgs {
     pub fn new(
-        font: Arc<RwLock<Fonts>>,
         buffer_size: Arc<RwLock<Size>>,
+        font: Arc<RwLock<Fonts>>,
     ) -> Self {
-        Self { font, buffer_size }
+        Self { buffer_size, font }
     }
 }
 
 pub struct TextDisplayDriver {
     display: Option<Arc<Mutex<dyn DisplayApi + Send>>>,
-    font: Option<Fonts>,
     text_buffer: Vec<ScreenChar>,
     text_cursor: Position,
     dirty_buffer: Vec<bool>,
+    font: Option<Fonts>,
     text_color: TextColor,
     background_color: TextColor,
     underline: bool,
@@ -181,7 +181,6 @@ pub struct TextDisplayDriver {
     buffer_height: usize
 } #[allow(dead_code)] impl TextDisplayDriver {
     pub fn init(&mut self, args: &mut TextDisplayDriverArgs) {
-        self.font = Some(args.font.read().clone());
         self.buffer_width = (*args.buffer_size.read()).width;
         self.buffer_height = (*args.buffer_size.read()).height;
         self.text_buffer = vec![ScreenChar::new(
@@ -190,6 +189,7 @@ pub struct TextDisplayDriver {
             CharacterAttributes::new(false, false)
         ); self.buffer_width * self.buffer_height];
         self.dirty_buffer = vec![false; self.buffer_width * self.buffer_height];
+        self.font = Some(args.font.read().clone());
     }
 
 
@@ -567,10 +567,10 @@ pub struct TextDisplayDriver {
 } impl CommonDisplayDriver for TextDisplayDriver {
     fn new() -> Self { Self {
         display: None,
-        font: None,
         text_buffer: Vec::new(),
         text_cursor: Position::new(0, 0),
         dirty_buffer: Vec::new(),
+        font: None,
         text_color: TextColor::White,
         background_color: TextColor::Black,
         underline: false,

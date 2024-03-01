@@ -11,18 +11,18 @@ use crate::systems::display::{BufferedDisplay, SimpleDisplay};
 pub enum DisplayMode {
     Unknown,
     Dummy,
-    Text(Fonts, Size)
+    Text(Size, Fonts)
 } impl DisplayMode {
     fn get_driver(self) -> DisplayDriverType {
         match self {
             DisplayMode::Unknown => DisplayDriverType::Unknown,
             DisplayMode::Dummy => DisplayDriverType::Dummy(
                 DummyDisplayDriver::new()
-            ), DisplayMode::Text(font, size) => DisplayDriverType::Text(
+            ), DisplayMode::Text(size, font) => DisplayDriverType::Text(
                 TextDisplayDriver::new(),
                 TextDisplayDriverArgs::new(
-                    Arc::new(RwLock::new(font)),
-                    Arc::new(RwLock::new(size))
+                    Arc::new(RwLock::new(size)),
+                    Arc::new(RwLock::new(font))
                 )
             )
         }
