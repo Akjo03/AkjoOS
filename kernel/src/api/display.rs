@@ -153,7 +153,7 @@ pub enum Fonts {
         Fonts::Font10x20 => FONT_10X20,
     } }
 } impl Default for Fonts {
-    fn default() -> Self { Fonts::Font9x18 }
+    fn default() -> Self { Fonts::Font10x20 }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
