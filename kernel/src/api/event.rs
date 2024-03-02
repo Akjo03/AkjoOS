@@ -11,8 +11,11 @@ static EVENT_DISPATCHER: Once<EventDispatcher> = Once::new();
 
 #[derive(Debug, Clone)]
 pub enum Event {
+    /// A timer event is triggered when the system timer ticks.
     Timer,
+    /// A real-time clock event is triggered when the real-time clock ticks.
     Rtc(Rtc),
+    /// An error event is triggered when the kernel encounters an error.
     Error(ErrorEvent)
 } impl Event {
     pub fn error(event: ErrorEvent) -> Self {
@@ -23,21 +26,33 @@ pub enum Event {
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum EventErrorLevel {
+    /// A (non-maskable) interrupt is an exception that cannot be ignored or masked and
+    /// is a result of a serious hardware error.
     Interrupt,
+    /// A trap is an exception that just gets reported and then the program continues.
     Trap,
+    /// A fault is an exception that must be handled and can be recovered from.
     Fault,
+    /// An abort is an exception that cannot be recovered from and the program must be terminated.
     Abort,
 }
 
 #[derive(Debug, Clone)]
 pub enum ErrorEvent {
+    /// A breakpoint was encountered.
     Breakpoint(String),
+    /// An invalid opcode was encountered.
     InvalidOpcode(String),
+    /// An invalid Task State Segment was encountered.
     InvalidTss(String, u64),
+    /// A page fault was encountered.
     PageFault(String, u64),
+    /// A general protection fault was encountered.
     GeneralProtectionFault(String, u64),
+    /// A double fault was encountered.
     DoubleFault(String, u64)
 } #[allow(dead_code)] impl ErrorEvent {
+    /// Returns the message associated with the error event.
     pub fn message(&self) -> &String {
         match self {
             ErrorEvent::Breakpoint(message) => message,
@@ -49,6 +64,7 @@ pub enum ErrorEvent {
         }
     }
 
+    /// Returns the level of the error event.
     pub fn level(&self) -> EventErrorLevel {
         match self {
             ErrorEvent::Breakpoint(..) => EventErrorLevel::Trap,

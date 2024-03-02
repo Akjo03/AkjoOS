@@ -169,9 +169,9 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     internal::idt::disable_interrupts();
     log::info!("Interrupts disabled.");
 
-    // Halt kernel
-    kernel.lock().halt();
-    log::info!("Kernel halted.");
+    // Shutdown kernel
+    kernel.lock().shutdown();
+    log::info!("Kernel shut down.");
 
     // Initiate shutdown
     acpi.shutdown().unwrap_or_else(|err| panic!("Failed to initiate shutdown: {:#?}", err));
@@ -183,9 +183,13 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
 #[allow(dead_code)]
 pub struct Kernel {
+    /// Used to manage the time and clock of the kernel.
     time_manager: TimeManager,
+    /// Used to manage the display and screen of the kernel.
     display_manager: DisplayManager,
+    /// The current tick of the kernel (incremented every timer event).
     pub tick: AtomicU64,
+    /// Whether the kernel is/should be running or not.
     pub running: AtomicBool
 } impl Kernel {
     pub fn new(
@@ -211,10 +215,14 @@ pub struct Kernel {
 }
 
 pub trait KernelRuntime {
+    /// Gets called when the kernel is initialized.
     fn init(&mut self);
+    /// Gets called on every timer event for the kernel.
     fn tick(&mut self);
+    /// Gets called when the kernel encounters an error.
     fn on_error(&mut self, event: ErrorEvent);
-    fn halt(&mut self);
+    /// Gets called when the kernel needs to shut down.
+    fn shutdown(&mut self);
 }
 
 #[panic_handler]
