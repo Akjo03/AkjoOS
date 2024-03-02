@@ -4,6 +4,7 @@ use core::sync::atomic::Ordering;
 use crate::api::event::{ErrorEvent, EventErrorLevel};
 use crate::{KernelRuntime, Kernel};
 use crate::api::display::{Fonts, Size};
+use crate::api::time::TimeOffset;
 use crate::drivers::display::DisplayDriverType;
 use crate::managers::display::DisplayMode;
 
@@ -24,7 +25,7 @@ impl KernelRuntime for Kernel {
                 driver.write_string(format!(
                     "Tick {} at {}",
                     current_tick, self.time_manager.with_clock(
-                        |clock| clock.now().to_string()
+                        |clock| clock.with_offset(TimeOffset::A).to_string()
                     ).unwrap_or("N/A".to_string())
                 ).as_str());
 

@@ -112,6 +112,13 @@ pub struct Duration {
         }
     }
 
+    pub fn from_hms(hours: u64, minutes: u64, seconds: u64) -> Self {
+        Self {
+            nanos: 0,
+            seconds: hours * 3600 + minutes * 60 + seconds,
+        }
+    }
+
     pub fn from_days(days: u64) -> Self {
         Self {
             nanos: 0,
@@ -171,6 +178,127 @@ pub struct Duration {
         let nanos = self.nanos.checked_div(rhs)?;
         let seconds = self.seconds.checked_div(rhs)?;
         Some(Self::new(nanos, seconds))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum TimeOffset {
+    Y = 0, // -12:00
+    X = 1, // -11:00
+    W = 2, // -10:00
+    V = 3, Vt = 4, // -09:00, -09:30
+    U = 5, // -08:00
+    T = 6, // -07:00
+    S = 7, // -06:00
+    R = 8, // -05:00
+    Q = 9, // -04:00
+    P = 10, Pt = 11, // -03:00, -03:30
+    O = 12, // -02:00
+    N = 13, // -01:00
+    Z = 14, // +/-00:00
+    A = 15, // +01:00
+    B = 16, // +02:00
+    C = 17, Ct = 18, // +03:00, +03:30
+    D = 19, Dt = 20, // +04:00, +04:30
+    E = 21, Et = 22, Ee = 23, // +05:00, +05:30, +05:45
+    F = 24, Ft = 25, // +06:00, +06:30
+    G = 26, // +07:00
+    H = 27, Hh = 28, // +08:00, +08:45
+    I = 29, It = 30, // +09:00, +09:30
+    K = 31, Kt = 32, // +10:00, +10:30
+    L = 33, // +11:00
+    M = 34, Mm = 35, Mt1 = 36, Mt2 = 37 // +12:00, +12:45, +13:00, +14:00
+} impl TimeOffset {
+    pub fn from_u8(offset: u8) -> Option<Self> {
+        match offset {
+            0 => Some(TimeOffset::Y),
+            1 => Some(TimeOffset::X),
+            2 => Some(TimeOffset::W),
+            3 => Some(TimeOffset::V),
+            4 => Some(TimeOffset::Vt),
+            5 => Some(TimeOffset::U),
+            6 => Some(TimeOffset::T),
+            7 => Some(TimeOffset::S),
+            8 => Some(TimeOffset::R),
+            9 => Some(TimeOffset::Q),
+            10 => Some(TimeOffset::P),
+            11 => Some(TimeOffset::Pt),
+            12 => Some(TimeOffset::O),
+            13 => Some(TimeOffset::N),
+            14 => Some(TimeOffset::Z),
+            15 => Some(TimeOffset::A),
+            16 => Some(TimeOffset::B),
+            17 => Some(TimeOffset::C),
+            18 => Some(TimeOffset::Ct),
+            19 => Some(TimeOffset::D),
+            20 => Some(TimeOffset::Dt),
+            21 => Some(TimeOffset::E),
+            22 => Some(TimeOffset::Et),
+            23 => Some(TimeOffset::Ee),
+            24 => Some(TimeOffset::F),
+            25 => Some(TimeOffset::Ft),
+            26 => Some(TimeOffset::G),
+            27 => Some(TimeOffset::H),
+            28 => Some(TimeOffset::Hh),
+            29 => Some(TimeOffset::I),
+            30 => Some(TimeOffset::It),
+            31 => Some(TimeOffset::K),
+            32 => Some(TimeOffset::Kt),
+            33 => Some(TimeOffset::L),
+            34 => Some(TimeOffset::M),
+            35 => Some(TimeOffset::Mm),
+            36 => Some(TimeOffset::Mt1),
+            37 => Some(TimeOffset::Mt2),
+            _ => None
+        }
+    }
+
+    pub fn as_u8(&self) -> u8 {
+        *self as u8
+    }
+
+    pub fn get_offset(&self) -> (bool, Duration) {
+        match self {
+            TimeOffset::Y => (false, Duration::from_hms(12, 0, 0)),
+            TimeOffset::X => (false, Duration::from_hms(11, 0, 0)),
+            TimeOffset::W => (false, Duration::from_hms(10, 0, 0)),
+            TimeOffset::V => (false, Duration::from_hms(9, 0, 0)),
+            TimeOffset::Vt => (false, Duration::from_hms(9, 30, 0)),
+            TimeOffset::U => (false, Duration::from_hms(8, 0, 0)),
+            TimeOffset::T => (false, Duration::from_hms(7, 0, 0)),
+            TimeOffset::S => (false, Duration::from_hms(6, 0, 0)),
+            TimeOffset::R => (false, Duration::from_hms(5, 0, 0)),
+            TimeOffset::Q => (false, Duration::from_hms(4, 0, 0)),
+            TimeOffset::P => (false, Duration::from_hms(3, 0, 0)),
+            TimeOffset::Pt => (false, Duration::from_hms(3, 30, 0)),
+            TimeOffset::O => (false, Duration::from_hms(2, 0, 0)),
+            TimeOffset::N => (false, Duration::from_hms(1, 0, 0)),
+            TimeOffset::Z => (true, Duration::from_hms(0, 0, 0)),
+            TimeOffset::A => (true, Duration::from_hms(1, 0, 0)),
+            TimeOffset::B => (true, Duration::from_hms(2, 0, 0)),
+            TimeOffset::C => (true, Duration::from_hms(3, 0, 0)),
+            TimeOffset::Ct => (true, Duration::from_hms(3, 30, 0)),
+            TimeOffset::D => (true, Duration::from_hms(4, 0, 0)),
+            TimeOffset::Dt => (true, Duration::from_hms(4, 30, 0)),
+            TimeOffset::E => (true, Duration::from_hms(5, 0, 0)),
+            TimeOffset::Et => (true, Duration::from_hms(5, 30, 0)),
+            TimeOffset::Ee => (true, Duration::from_hms(5, 45, 0)),
+            TimeOffset::F => (true, Duration::from_hms(6, 0, 0)),
+            TimeOffset::Ft => (true, Duration::from_hms(6, 30, 0)),
+            TimeOffset::G => (true, Duration::from_hms(7, 0, 0)),
+            TimeOffset::H => (true, Duration::from_hms(8, 0, 0)),
+            TimeOffset::Hh => (true, Duration::from_hms(8, 45, 0)),
+            TimeOffset::I => (true, Duration::from_hms(9, 0, 0)),
+            TimeOffset::It => (true, Duration::from_hms(9, 30, 0)),
+            TimeOffset::K => (true, Duration::from_hms(10, 0, 0)),
+            TimeOffset::Kt => (true, Duration::from_hms(10, 30, 0)),
+            TimeOffset::L => (true, Duration::from_hms(11, 0, 0)),
+            TimeOffset::M => (true, Duration::from_hms(12, 0, 0)),
+            TimeOffset::Mm => (true, Duration::from_hms(12, 45, 0)),
+            TimeOffset::Mt1 => (true, Duration::from_hms(13, 0, 0)),
+            TimeOffset::Mt2 => (true, Duration::from_hms(14, 0, 0)),
+        }
     }
 }
 
@@ -400,6 +528,7 @@ pub struct Date {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct DateTime {
     time: Time,
     date: Date,
@@ -484,6 +613,42 @@ pub struct DateTime {
             date: adjusted_date,
         })
     }
+
+    pub fn sub(&self, rhs: Duration) -> Option<Self> {
+        let new_time = self.time.sub(rhs)?;
+        let additional_days = new_time.hours / 24;
+        let new_hours = new_time.hours % 24;
+        let adjusted_time = Time::new(new_time.nano, new_time.seconds, new_time.minutes, new_hours);
+
+        let mut day = self.date.day() as i64 - additional_days as i64;
+        let mut month = self.date.month() as i8;
+        let mut year = self.date.year();
+
+        while day < 1 {
+            month -= 1;
+            if month < 1 {
+                month = 12;
+                year -= 1;
+            }
+            day += Date::new(1, Month::from_u8(month as u8).unwrap(), year).days_in_month() as i64;
+        }
+
+        let adjusted_date = Date::new(day as u8, Month::from_u8(month as u8).unwrap(), year);
+
+        Some(DateTime {
+            time: adjusted_time,
+            date: adjusted_date,
+        })
+    }
+
+    pub fn with_offset(&self, offset: TimeOffset) -> DateTime {
+        let (positive, duration) = offset.get_offset();
+        if positive {
+            self.add(duration).unwrap()
+        } else {
+            self.sub(duration).unwrap()
+        }
+    }
 } impl From<Rtc> for DateTime {
     fn from(rtc: Rtc) -> Self {
         Self::new(
@@ -499,5 +664,7 @@ pub struct DateTime {
 
 pub trait TimeApi {
     /// Get the current date and time.
-    fn now(&self) -> &DateTime;
+    fn now(&self) -> DateTime;
+    /// Get the current date and time with an offset.
+    fn with_offset(&self, offset: TimeOffset) -> DateTime;
 }
