@@ -333,20 +333,41 @@ pub struct Time {
 
     pub fn as_hms_nano(&self) -> (u8, u8, u8, u32) { (self.hours, self.minutes, self.seconds, self.nano()) }
 
-    pub fn add(&self, rhs: Duration) -> Option<Self> {
-        let nano = self.nano.checked_add(rhs.nanos as u32)?;
-        let seconds = self.seconds.checked_add(rhs.seconds as u8)?;
-        let minutes = self.minutes.checked_add(seconds / 60)?;
-        let hours = self.hours.checked_add(minutes / 60)?;
-        Some(Self::new(nano, seconds, minutes, hours))
+    pub fn add(&self, rhs: Duration) -> Self {
+        let total_nanos = self.nano as u64 + rhs.nanos;
+        let extra_seconds = total_nanos / 1_000_000_000;
+        let nano = (total_nanos % 1_000_000_000) as u32;
+
+        let total_seconds = self.seconds as u64 + rhs.seconds + extra_seconds;
+        let seconds = (total_seconds % 60) as u8;
+
+        let total_minutes = self.minutes as u64 + (total_seconds / 60);
+        let minutes = (total_minutes % 60) as u8;
+
+        let hours = (self.hours as u64 + (total_minutes / 60)) % 24;
+
+        Self { nano, seconds, minutes, hours: hours as u8 }
     }
 
-    pub fn sub(&self, rhs: Duration) -> Option<Self> {
-        let nano = self.nano.checked_sub(rhs.nanos as u32)?;
-        let seconds = self.seconds.checked_sub(rhs.seconds as u8)?;
-        let minutes = self.minutes.checked_sub(seconds / 60)?;
-        let hours = self.hours.checked_sub(minutes / 60)?;
-        Some(Self::new(nano, seconds, minutes, hours))
+    pub fn sub(&self, rhs: Duration) -> Self {
+        let rhs_total_nanos = rhs.seconds * 1_000_000_000 + rhs.nanos;
+        let self_total_nanos = self.seconds as u64 * 1_000_000_000 + self.nano as u64;
+        let total_nanos = if self_total_nanos > rhs_total_nanos {
+            self_total_nanos - rhs_total_nanos
+        } else {
+            0
+        };
+
+        let nano = (total_nanos % 1_000_000_000) as u32;
+        let total_seconds = total_nanos / 1_000_000_000;
+
+        let seconds = (total_seconds % 60) as u8;
+        let total_minutes = self.minutes as u64 + (total_seconds / 60);
+
+        let minutes = (total_minutes % 60) as u8;
+        let hours = ((self.hours as u64 + (total_minutes / 60)) % 24) as u8;
+
+        Self { nano, seconds, minutes, hours }
     }
 } impl From<Rtc> for Time {
     fn from(rtc: Rtc) -> Self {
@@ -435,72 +456,52 @@ pub struct Date {
         }
     }
 
-    pub fn add(&self, rhs: Duration) -> Option<Self> {
-        let mut day = self.day as u64;
-        let mut month = self.month as u8;
-        let mut year = self.year;
+    pub fn add(&self, rhs: Duration) -> Self {
+        let mut days_to_add = rhs.seconds / 86_400;
+        let mut new_day = self.day;
+        let mut new_month = self.month as u8;
+        let mut new_year = self.year;
 
-        let nano = rhs.nanos;
-        let seconds = rhs.seconds;
-
-        let mut seconds = seconds;
-        let mut nano = nano;
-
-        while nano >= 1_000_000_000 {
-            nano -= 1_000_000_000;
-            seconds += 1;
+        while days_to_add > 0 {
+            let days_in_current_month = Date::new(1, Month::from_u8(new_month).unwrap(), new_year).days_in_month();
+            if new_day as u64 + days_to_add > days_in_current_month as u64 {
+                days_to_add -= (days_in_current_month - new_day) as u64 + 1;
+                new_day = 1;
+                new_month += 1;
+                if new_month > 12 {
+                    new_month = 1;
+                    new_year += 1;
+                }
+            } else {
+                new_day += days_to_add as u8;
+                days_to_add = 0;
+            }
         }
 
-        while seconds >= 86400 {
-            seconds -= 86400;
-            day += 1;
-        }
-
-        while day > self.days_in_month() as u64 {
-            day -= self.days_in_month() as u64;
-            month += 1;
-        }
-
-        while month > 12 {
-            month -= 12;
-            year += 1;
-        }
-
-        Some(Self::new(day as u8, Month::from_u8(month).unwrap(), year))
+        Date::new(new_day, Month::from_u8(new_month).unwrap(), new_year)
     }
 
-    pub fn sub(&self, rhs: Duration) -> Option<Self> {
-        let mut day = self.day as i64;
-        let mut month = self.month as i8;
-        let mut year = self.year;
+    pub fn sub(&self, rhs: Duration) -> Self {
+        let mut days_to_sub = rhs.seconds / 86_400;
+        let mut new_day = self.day as i64;
+        let mut new_month = self.month as u8;
+        let mut new_year = self.year;
 
-        let nano = rhs.nanos as i64;
-        let seconds = rhs.seconds as i64;
-
-        let mut seconds = seconds;
-        let mut nano = nano;
-
-        while nano < 0 {
-            nano += 1_000_000_000;
-            seconds -= 1;
+        while days_to_sub > 0 {
+            if new_day as u64 <= days_to_sub {
+                days_to_sub -= new_day as u64;
+                new_month = if new_month == 1 { 12 } else { new_month - 1 };
+                new_day = Date::new(1, Month::from_u8(new_month).unwrap(), new_year).days_in_month() as i64;
+                if new_month == 12 {
+                    new_year -= 1;
+                }
+            } else {
+                new_day -= days_to_sub as i64;
+                days_to_sub = 0;
+            }
         }
 
-        while seconds < 0 {
-            seconds += 86400;
-            day -= 1;
-        }
-
-        while day < 1 {
-            month -= 1;
-            day += self.days_in_month() as i64;
-        }
-
-        while month < 1 {
-            month += 12;
-            year -= 1;
-        }
-
-        Some(Self::new(day as u8, Month::from_u8(month as u8).unwrap(), year))
+        Date::new(new_day as u8, Month::from_u8(new_month).unwrap(), new_year)
     }
 
     pub fn as_calendar_date(&self) -> (i32, Month, u8) {
@@ -587,66 +588,26 @@ pub struct DateTime {
 
     pub fn as_week_date(&self) -> (i32, u8, Weekday) { self.date.as_week_date() }
 
-    pub fn add(&self, rhs: Duration) -> Option<Self> {
-        let new_time = self.time.add(rhs)?;
-        let additional_days = new_time.hours / 24;
-        let new_hours = new_time.hours % 24;
-        let adjusted_time = Time::new(new_time.nano, new_time.seconds, new_time.minutes, new_hours);
-
-        let mut day = self.date.day() as u64 + additional_days as u64;
-        let mut month = self.date.month() as u8;
-        let mut year = self.date.year();
-
-        while day > Date::new(1, Month::from_u8(month).unwrap(), year).days_in_month() as u64 {
-            day -= Date::new(1, Month::from_u8(month).unwrap(), year).days_in_month() as u64;
-            month += 1;
-            if month > 12 {
-                month = 1;
-                year += 1;
-            }
-        }
-
-        let adjusted_date = Date::new(day as u8, Month::from_u8(month).unwrap(), year);
-
-        Some(DateTime {
-            time: adjusted_time,
-            date: adjusted_date,
-        })
+    pub fn add(&self, rhs: Duration) -> Self {
+        let new_time = self.time.add(rhs);
+        let day_overflow = new_time.hours / 24;
+        let new_date = self.date.add(Duration::from_days(day_overflow as u64));
+        DateTime { time: Time::new(new_time.nano, new_time.seconds, new_time.minutes, new_time.hours % 24), date: new_date }
     }
 
-    pub fn sub(&self, rhs: Duration) -> Option<Self> {
-        let new_time = self.time.sub(rhs)?;
-        let additional_days = new_time.hours / 24;
-        let new_hours = new_time.hours % 24;
-        let adjusted_time = Time::new(new_time.nano, new_time.seconds, new_time.minutes, new_hours);
-
-        let mut day = self.date.day() as i64 - additional_days as i64;
-        let mut month = self.date.month() as i8;
-        let mut year = self.date.year();
-
-        while day < 1 {
-            month -= 1;
-            if month < 1 {
-                month = 12;
-                year -= 1;
-            }
-            day += Date::new(1, Month::from_u8(month as u8).unwrap(), year).days_in_month() as i64;
-        }
-
-        let adjusted_date = Date::new(day as u8, Month::from_u8(month as u8).unwrap(), year);
-
-        Some(DateTime {
-            time: adjusted_time,
-            date: adjusted_date,
-        })
+    pub fn sub(&self, rhs: Duration) -> Self {
+        let new_time = self.time.sub(rhs);
+        let day_underflow = if new_time.hours > self.time.hours { 1 } else { 0 };
+        let new_date = self.date.sub(Duration::from_days(day_underflow as u64));
+        DateTime { time: Time::new(new_time.nano, new_time.seconds, new_time.minutes, new_time.hours % 24), date: new_date }
     }
 
     pub fn with_offset(&self, offset: TimeOffset) -> DateTime {
         let (positive, duration) = offset.get_offset();
         if positive {
-            self.add(duration).unwrap()
+            self.add(duration)
         } else {
-            self.sub(duration).unwrap()
+            self.sub(duration)
         }
     }
 } impl From<Rtc> for DateTime {

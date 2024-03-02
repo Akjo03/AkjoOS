@@ -25,7 +25,7 @@ impl KernelRuntime for Kernel {
                 driver.write_string(format!(
                     "Tick {} at {}",
                     current_tick, self.time_manager.with_clock(
-                        |clock| clock.with_offset(TimeOffset::A).to_string()
+                        |clock| clock.with_offset(TimeOffset::B).to_string()
                     ).unwrap_or("N/A".to_string())
                 ).as_str());
 
