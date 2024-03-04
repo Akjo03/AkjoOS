@@ -18,7 +18,7 @@ pub struct SimpleClock {
 } impl EventHandler for SimpleClock {
     fn handle(&mut self, event: Event) {
         match event {
-            Event::Rtc(date_time) => self.current_time = DateTime::from(date_time),
+            Event::Rtc(date_time) => self.current_time = DateTime::from_rtc(date_time),
             _ => {}
         }
     }

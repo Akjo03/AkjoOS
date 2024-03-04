@@ -364,6 +364,15 @@ pub struct Time {
         nano, seconds, minutes, hours,
     } }
 
+    pub fn from_rtc(rtc: Rtc) -> Self {
+        Self {
+            nano: 0,
+            seconds: rtc.seconds,
+            minutes: rtc.minutes,
+            hours: rtc.hours,
+        }
+    }
+
     pub fn nano(&self) -> u32 { self.nano }
 
     pub fn micro(&self) -> u32 { self.nano / 1000 }
@@ -420,15 +429,6 @@ pub struct Time {
 
         Self { nano, seconds, minutes, hours }
     }
-} impl From<Rtc> for Time {
-    fn from(rtc: Rtc) -> Self {
-        Self {
-            nano: 0,
-            seconds: rtc.seconds,
-            minutes: rtc.minutes,
-            hours: rtc.hours,
-        }
-    }
 } impl Display for Time {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:02}:{:02}:{:02}.{:03}", self.hours, self.minutes, self.seconds, self.milli())
@@ -444,6 +444,14 @@ pub struct Date {
     pub fn new(day: u8, month: Month, year: i32) -> Self { Self {
         day, month, year,
     } }
+
+    pub fn from_rtc(rtc: Rtc) -> Self {
+        Self {
+            day: rtc.day,
+            month: Month::from_u8(rtc.month).unwrap(),
+            year: rtc.year as i32,
+        }
+    }
 
     pub fn day(&self) -> u8 { self.day }
 
@@ -566,14 +574,6 @@ pub struct Date {
     pub fn as_week_date(&self) -> (i32, u8, Weekday) {
         (self.year, self.week(), self.weekday())
     }
-} impl From<Rtc> for Date {
-    fn from(rtc: Rtc) -> Self {
-        Self {
-            day: rtc.day,
-            month: Month::from_u8(rtc.month).unwrap(),
-            year: rtc.year as i32,
-        }
-    }
 } impl Display for Date {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:02}/{:02}/{:04}", self.day, self.month as u8, self.year)
@@ -592,6 +592,13 @@ pub struct DateTime {
         time: Time::new(nano, seconds, minutes, hours),
         date: Date::new(day, month, year),
     } }
+
+    pub fn from_rtc(rtc: Rtc) -> Self {
+        Self::new(
+            0, rtc.seconds, rtc.minutes, rtc.hours,
+            rtc.day, Month::from_u8(rtc.month).unwrap(), rtc.year as i32,
+        )
+    }
 
     pub fn time(&self) -> Time { self.time }
 
@@ -660,13 +667,6 @@ pub struct DateTime {
         } else {
             self.sub(duration)
         }
-    }
-} impl From<Rtc> for DateTime {
-    fn from(rtc: Rtc) -> Self {
-        Self::new(
-            0, rtc.seconds, rtc.minutes, rtc.hours,
-            rtc.day, Month::from_u8(rtc.month).unwrap(), rtc.year as i32,
-        )
     }
 } impl Display for DateTime {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
